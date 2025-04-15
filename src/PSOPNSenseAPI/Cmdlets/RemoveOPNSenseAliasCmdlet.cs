@@ -50,44 +50,54 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var aliasService = new AliasService(ApiClient, Logger);
+
+            // Get the alias details for the confirmation message
+            var getResult = ExecuteAsyncTask(() => aliasService.GetAliasAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var aliasService = new AliasService(ApiClient, Logger);
+                return;
+            }
 
-                // Get the alias details for the confirmation message
-                var getTask = Task.Run(async () => await aliasService.GetAliasAsync(Uuid));
-                var alias = getTask.GetAwaiter().GetResult().Alias;
+            var alias = getResult.Alias;
 
-                string confirmMessage = $"Alias: {alias.Name} ({alias.Type})";
-                if (!string.IsNullOrEmpty(alias.Description))
-                {
-                    confirmMessage += $" - {alias.Description}";
-                }
+            string confirmMessage = $"Alias: {alias.Name} ({alias.Type})";
+            if (!string.IsNullOrEmpty(alias.Description))
+            {
+                confirmMessage += $" - {alias.Description}";
+            }
 
-                if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            {
+                return;
+            }
+
+            var deleteResult = ExecuteAsyncTask(() => aliasService.DeleteAliasAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || deleteResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Alias {Uuid} removed: {deleteResult.Result}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => aliasService.ReconfigureAliasesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
                 {
                     return;
                 }
 
-                var deleteTask = Task.Run(async () => await aliasService.DeleteAliasAsync(Uuid));
-                var deleteResult = deleteTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Alias {Uuid} removed: {deleteResult.Result}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await aliasService.ReconfigureAliasesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"Alias changes applied: {applyResult.Status}");
-                }
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
+                WriteVerbose($"Alias changes applied: {applyResult.Status}");
             }
         }
     }

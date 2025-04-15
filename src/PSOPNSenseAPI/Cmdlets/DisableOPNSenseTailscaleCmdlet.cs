@@ -38,79 +38,100 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var tailscaleService = new TailscaleService(ApiClient, Logger);
+
+            // Check if the plugin is installed
+            var isInstalled = ExecuteAsyncTask(() => tailscaleService.IsPluginInstalledAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null)
             {
-                var tailscaleService = new TailscaleService(ApiClient, Logger);
+                return;
+            }
 
-                // Check if the plugin is installed
-                var isInstalledTask = Task.Run(async () => await tailscaleService.IsPluginInstalledAsync());
-                var isInstalled = isInstalledTask.GetAwaiter().GetResult();
+            if (!isInstalled)
+            {
+                WriteWarning("Tailscale plugin is not installed on the OPNSense firewall.");
+                return;
+            }
 
-                if (!isInstalled)
+            // Get current settings
+            var settingsResult = ExecuteAsyncTask(() => tailscaleService.GetSettingsAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || settingsResult == null)
+            {
+                return;
+            }
+
+            var currentSettings = settingsResult.General;
+
+            // Create new settings with disabled flag
+            var settings = new TailscaleSettings
+            {
+                Enabled = "0",
+                AcceptDns = currentSettings.AcceptDns,
+                AcceptRoutes = currentSettings.AcceptRoutes,
+                AdvertiseExitNode = currentSettings.AdvertiseExitNode,
+                AdvertiseRoutes = currentSettings.AdvertiseRoutes,
+                RoutesToAdvertise = currentSettings.RoutesToAdvertise,
+                Hostname = currentSettings.Hostname,
+                LoginServer = currentSettings.LoginServer,
+                Ssh = currentSettings.Ssh,
+                Ephemeral = currentSettings.Ephemeral,
+                ResetOnStart = currentSettings.ResetOnStart
+            };
+
+            if (!Force.IsPresent && !ShouldProcess("OPNSense firewall", "Disable Tailscale"))
+            {
+                return;
+            }
+
+            // Update settings
+            var updateResult = ExecuteAsyncTask(() => tailscaleService.UpdateSettingsAsync(settings));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Tailscale settings updated: {updateResult.Result}");
+
+            // Stop the service if requested
+            if (Stop.IsPresent)
+            {
+                WriteVerbose("Stopping Tailscale service...");
+                var stopResult = ExecuteAsyncTask(() => tailscaleService.StopServiceAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || stopResult == null)
                 {
-                    WriteWarning("Tailscale plugin is not installed on the OPNSense firewall.");
                     return;
                 }
 
-                // Get current settings
-                var settingsTask = Task.Run(async () => await tailscaleService.GetSettingsAsync());
-                var currentSettings = settingsTask.GetAwaiter().GetResult().General;
-
-                // Create new settings with disabled flag
-                var settings = new TailscaleSettings
-                {
-                    Enabled = "0",
-                    AcceptDns = currentSettings.AcceptDns,
-                    AcceptRoutes = currentSettings.AcceptRoutes,
-                    AdvertiseExitNode = currentSettings.AdvertiseExitNode,
-                    AdvertiseRoutes = currentSettings.AdvertiseRoutes,
-                    RoutesToAdvertise = currentSettings.RoutesToAdvertise,
-                    Hostname = currentSettings.Hostname,
-                    LoginServer = currentSettings.LoginServer,
-                    Ssh = currentSettings.Ssh,
-                    Ephemeral = currentSettings.Ephemeral,
-                    ResetOnStart = currentSettings.ResetOnStart
-                };
-
-                if (!Force.IsPresent && !ShouldProcess("OPNSense firewall", "Disable Tailscale"))
-                {
-                    return;
-                }
-
-                // Update settings
-                var updateTask = Task.Run(async () => await tailscaleService.UpdateSettingsAsync(settings));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Tailscale settings updated: {updateResult.Result}");
-
-                // Stop the service if requested
-                if (Stop.IsPresent)
-                {
-                    WriteVerbose("Stopping Tailscale service...");
-                    var stopTask = Task.Run(async () => await tailscaleService.StopServiceAsync());
-                    var stopResult = stopTask.GetAwaiter().GetResult();
-                    WriteVerbose($"Tailscale service stopped: {stopResult.Status}");
-                }
-
-                // Get updated status
-                var statusTask = Task.Run(async () => await tailscaleService.GetStatusAsync());
-                var status = statusTask.GetAwaiter().GetResult();
-
-                // Create result object
-                var result = new PSObject();
-                result.Properties.Add(new PSNoteProperty("PluginInstalled", true));
-                result.Properties.Add(new PSNoteProperty("Enabled", status.Enabled));
-                result.Properties.Add(new PSNoteProperty("Running", status.Running));
-                result.Properties.Add(new PSNoteProperty("Status", status.Status));
-
-                WriteObject(result);
+                WriteVerbose($"Tailscale service stopped: {stopResult.Status}");
             }
-            catch (Exception ex)
+
+            // Get updated status
+            var status = ExecuteAsyncTask(() => tailscaleService.GetStatusAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || status == null)
             {
-                HandleException(ex);
+                return;
             }
+
+            // Create result object
+            var result = new PSObject();
+            result.Properties.Add(new PSNoteProperty("PluginInstalled", true));
+            result.Properties.Add(new PSNoteProperty("Enabled", status.Enabled));
+            result.Properties.Add(new PSNoteProperty("Running", status.Running));
+            result.Properties.Add(new PSNoteProperty("Status", status.Status));
+
+            WriteObject(result);
         }
     }
 }

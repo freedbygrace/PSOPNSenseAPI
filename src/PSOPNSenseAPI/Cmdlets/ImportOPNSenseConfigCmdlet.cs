@@ -35,42 +35,46 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
+            string fullPath = Path.FullName;
+
+            // Check if the file exists
+            if (!File.Exists(fullPath))
+            {
+                ProcessingException = new FileNotFoundException($"The file '{fullPath}' does not exist.");
+                WriteWarning($"The file '{fullPath}' does not exist.");
+                return;
+            }
+
+            if (!Force.IsPresent && !ShouldProcess(fullPath, "Import configuration"))
+            {
+                return;
+            }
+
+            var configService = new ConfigService(ApiClient, Logger);
+
             try
             {
-                string fullPath = Path.FullName;
-
-                // Check if the file exists
-                if (!File.Exists(fullPath))
-                {
-                    WriteError(new ErrorRecord(
-                        new FileNotFoundException($"The file '{fullPath}' does not exist."),
-                        "FileNotFound",
-                        ErrorCategory.ObjectNotFound,
-                        fullPath));
-                    return;
-                }
-
-                if (!Force.IsPresent && !ShouldProcess(fullPath, "Import configuration"))
-                {
-                    return;
-                }
-
-                var configService = new ConfigService(ApiClient, Logger);
-
                 // Read the configuration file
                 var configContent = File.ReadAllBytes(fullPath);
 
-                // Execute the async method synchronously on the main thread
-                var result = configService.ImportConfigAsync(configContent).GetAwaiter().GetResult();
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => configService.ImportConfigAsync(configContent));
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
+                {
+                    return;
+                }
 
                 WriteVerbose($"Imported configuration from {fullPath}: {result.Status}");
                 WriteWarning("The firewall is restarting. You may need to reconnect after it comes back online.");
             }
             catch (Exception ex)
             {
-                HandleException(ex);
+                ProcessingException = ex;
+                WriteWarning($"Failed to read or process configuration file: {ex.Message}");
             }
         }
     }

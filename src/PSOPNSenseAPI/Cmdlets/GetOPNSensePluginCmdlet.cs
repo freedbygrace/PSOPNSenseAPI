@@ -43,60 +43,59 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var pluginService = new PluginService(ApiClient, Logger);
+
+            // Use our safe execution method
+            var result = ExecuteAsyncTask(() => pluginService.GetPluginsAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || result == null)
             {
-                var pluginService = new PluginService(ApiClient, Logger);
+                return;
+            }
 
-                var task = Task.Run(async () => await pluginService.GetPluginsAsync());
-                var result = task.GetAwaiter().GetResult();
-
-                if (ParameterSetName == "Installed" || ParameterSetName == "")
+            if (ParameterSetName == "Installed" || ParameterSetName == "")
+            {
+                foreach (var kvp in result.Installed)
                 {
-                    foreach (var kvp in result.Installed)
-                    {
-                        var plugin = new PSObject();
-                        plugin.Properties.Add(new PSNoteProperty("Name", kvp.Key));
-                        plugin.Properties.Add(new PSNoteProperty("Version", kvp.Value.Version));
-                        plugin.Properties.Add(new PSNoteProperty("Comment", kvp.Value.Comment));
-                        plugin.Properties.Add(new PSNoteProperty("Repository", kvp.Value.Repository));
-                        plugin.Properties.Add(new PSNoteProperty("Origin", kvp.Value.Origin));
-                        plugin.Properties.Add(new PSNoteProperty("License", kvp.Value.License));
-                        plugin.Properties.Add(new PSNoteProperty("FlatSize", kvp.Value.FlatSize));
-                        plugin.Properties.Add(new PSNoteProperty("Locked", kvp.Value.Locked == "1"));
-                        plugin.Properties.Add(new PSNoteProperty("Enabled", kvp.Value.Enabled == "1"));
-                        plugin.Properties.Add(new PSNoteProperty("Status", "Installed"));
-                        
-                        WriteObject(plugin);
-                    }
-                }
+                    var plugin = new PSObject();
+                    plugin.Properties.Add(new PSNoteProperty("Name", kvp.Key));
+                    plugin.Properties.Add(new PSNoteProperty("Version", kvp.Value.Version));
+                    plugin.Properties.Add(new PSNoteProperty("Comment", kvp.Value.Comment));
+                    plugin.Properties.Add(new PSNoteProperty("Repository", kvp.Value.Repository));
+                    plugin.Properties.Add(new PSNoteProperty("Origin", kvp.Value.Origin));
+                    plugin.Properties.Add(new PSNoteProperty("License", kvp.Value.License));
+                    plugin.Properties.Add(new PSNoteProperty("FlatSize", kvp.Value.FlatSize));
+                    plugin.Properties.Add(new PSNoteProperty("Locked", kvp.Value.Locked == "1"));
+                    plugin.Properties.Add(new PSNoteProperty("Enabled", kvp.Value.Enabled == "1"));
+                    plugin.Properties.Add(new PSNoteProperty("Status", "Installed"));
 
-                if (ParameterSetName == "Available" || ParameterSetName == "")
-                {
-                    foreach (var kvp in result.Available)
-                    {
-                        // Skip if the plugin is already installed
-                        if (result.Installed.ContainsKey(kvp.Key))
-                            continue;
-
-                        var plugin = new PSObject();
-                        plugin.Properties.Add(new PSNoteProperty("Name", kvp.Key));
-                        plugin.Properties.Add(new PSNoteProperty("Version", kvp.Value.Version));
-                        plugin.Properties.Add(new PSNoteProperty("Comment", kvp.Value.Comment));
-                        plugin.Properties.Add(new PSNoteProperty("Repository", kvp.Value.Repository));
-                        plugin.Properties.Add(new PSNoteProperty("Origin", kvp.Value.Origin));
-                        plugin.Properties.Add(new PSNoteProperty("License", kvp.Value.License));
-                        plugin.Properties.Add(new PSNoteProperty("FlatSize", kvp.Value.FlatSize));
-                        plugin.Properties.Add(new PSNoteProperty("Status", "Available"));
-                        
-                        WriteObject(plugin);
-                    }
+                    WriteObject(plugin);
                 }
             }
-            catch (Exception ex)
+
+            if (ParameterSetName == "Available" || ParameterSetName == "")
             {
-                HandleException(ex);
+                foreach (var kvp in result.Available)
+                {
+                    // Skip if the plugin is already installed
+                    if (result.Installed.ContainsKey(kvp.Key))
+                        continue;
+
+                    var plugin = new PSObject();
+                    plugin.Properties.Add(new PSNoteProperty("Name", kvp.Key));
+                    plugin.Properties.Add(new PSNoteProperty("Version", kvp.Value.Version));
+                    plugin.Properties.Add(new PSNoteProperty("Comment", kvp.Value.Comment));
+                    plugin.Properties.Add(new PSNoteProperty("Repository", kvp.Value.Repository));
+                    plugin.Properties.Add(new PSNoteProperty("Origin", kvp.Value.Origin));
+                    plugin.Properties.Add(new PSNoteProperty("License", kvp.Value.License));
+                    plugin.Properties.Add(new PSNoteProperty("FlatSize", kvp.Value.FlatSize));
+                    plugin.Properties.Add(new PSNoteProperty("Status", "Available"));
+
+                    WriteObject(plugin);
+                }
             }
         }
     }

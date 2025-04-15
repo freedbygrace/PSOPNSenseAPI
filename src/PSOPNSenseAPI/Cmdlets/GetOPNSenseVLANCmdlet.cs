@@ -33,28 +33,35 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
-            {
-                var interfaceService = new InterfaceService(ApiClient, Logger);
+            var interfaceService = new InterfaceService(ApiClient, Logger);
 
-                if (ParameterSetName == "ByUuid")
-                {
-                    var task = Task.Run(async () => await interfaceService.GetVLANAsync(Uuid));
-                    var result = task.GetAwaiter().GetResult();
-                    WriteObject(result.Vlan);
-                }
-                else
-                {
-                    var task = Task.Run(async () => await interfaceService.GetVLANsAsync());
-                    var result = task.GetAwaiter().GetResult();
-                    WriteObject(result.Rows, true);
-                }
-            }
-            catch (Exception ex)
+            if (ParameterSetName == "ByUuid")
             {
-                HandleException(ex);
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => interfaceService.GetVLANAsync(Uuid));
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
+                {
+                    return;
+                }
+
+                WriteObject(result.Vlan);
+            }
+            else
+            {
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => interfaceService.GetVLANsAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
+                {
+                    return;
+                }
+
+                WriteObject(result.Rows, true);
             }
         }
     }

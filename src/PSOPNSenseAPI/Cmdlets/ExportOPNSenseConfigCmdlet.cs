@@ -35,28 +35,31 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
+            string fullPath = Path.FullName;
+
+            // Check if the file exists
+            if (File.Exists(fullPath) && !Force.IsPresent)
+            {
+                ProcessingException = new IOException($"The file '{fullPath}' already exists. Use -Force to overwrite.");
+                WriteWarning($"The file '{fullPath}' already exists. Use -Force to overwrite.");
+                return;
+            }
+
+            var configService = new ConfigService(ApiClient, Logger);
+
+            // Use our safe execution method
+            var configContent = ExecuteAsyncTask(() => configService.ExportConfigAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || configContent == null)
+            {
+                return;
+            }
+
             try
             {
-                string fullPath = Path.FullName;
-
-                // Check if the file exists
-                if (File.Exists(fullPath) && !Force.IsPresent)
-                {
-                    WriteError(new ErrorRecord(
-                        new IOException($"The file '{fullPath}' already exists. Use -Force to overwrite."),
-                        "FileExists",
-                        ErrorCategory.ResourceExists,
-                        fullPath));
-                    return;
-                }
-
-                var configService = new ConfigService(ApiClient, Logger);
-
-                // Execute the async method synchronously on the main thread
-                var configContent = configService.ExportConfigAsync().GetAwaiter().GetResult();
-
                 // Create the directory if it doesn't exist
                 var directory = System.IO.Path.GetDirectoryName(fullPath);
                 if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
@@ -71,7 +74,8 @@ namespace PSOPNSenseAPI.Cmdlets
             }
             catch (Exception ex)
             {
-                HandleException(ex);
+                ProcessingException = ex;
+                WriteWarning($"Failed to write configuration to file: {ex.Message}");
             }
         }
     }

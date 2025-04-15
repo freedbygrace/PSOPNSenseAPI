@@ -94,65 +94,75 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var dhcpService = new DHCPService(ApiClient, Logger);
+
+            // First, get the current server configuration
+            var getResult = ExecuteAsyncTask(() => dhcpService.GetServerAsync(Interface));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var dhcpService = new DHCPService(ApiClient, Logger);
-
-                // First, get the current server configuration
-                var getTask = Task.Run(async () => await dhcpService.GetServerAsync(Interface));
-                var currentServer = getTask.GetAwaiter().GetResult().Server;
-
-                // Create the updated configuration
-                var server = new DHCPServerConfig
-                {
-                    RangeFrom = RangeFrom ?? currentServer.RangeFrom,
-                    RangeTo = RangeTo ?? currentServer.RangeTo,
-                    DefaultLeaseTime = DefaultLeaseTime?.ToString() ?? currentServer.DefaultLeaseTime,
-                    MaxLeaseTime = MaxLeaseTime?.ToString() ?? currentServer.MaxLeaseTime,
-                    Domain = Domain ?? currentServer.Domain,
-                    DnsServers = DnsServers != null ? new List<string>(DnsServers) : currentServer.DnsServers,
-                    Gateway = Gateway ?? currentServer.Gateway
-                };
-
-                // Handle enabled/disabled state
-                if (Enabled.IsPresent && Disabled.IsPresent)
-                {
-                    WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
-                    server.Enabled = "1";
-                }
-                else if (Enabled.IsPresent)
-                {
-                    server.Enabled = "1";
-                }
-                else if (Disabled.IsPresent)
-                {
-                    server.Enabled = "0";
-                }
-                else
-                {
-                    server.Enabled = currentServer.Enabled;
-                }
-
-                // Update the server
-                var updateTask = Task.Run(async () => await dhcpService.UpdateServerAsync(Interface, server));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"DHCP server for interface {Interface} updated: {updateResult.Result}");
-
-                // Apply the changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await dhcpService.ApplyChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-                    
-                    WriteVerbose($"DHCP changes applied: {applyResult.Status}");
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var currentServer = getResult.Server;
+
+            // Create the updated configuration
+            var server = new DHCPServerConfig
             {
-                HandleException(ex);
+                RangeFrom = RangeFrom ?? currentServer.RangeFrom,
+                RangeTo = RangeTo ?? currentServer.RangeTo,
+                DefaultLeaseTime = DefaultLeaseTime?.ToString() ?? currentServer.DefaultLeaseTime,
+                MaxLeaseTime = MaxLeaseTime?.ToString() ?? currentServer.MaxLeaseTime,
+                Domain = Domain ?? currentServer.Domain,
+                DnsServers = DnsServers != null ? new List<string>(DnsServers) : currentServer.DnsServers,
+                Gateway = Gateway ?? currentServer.Gateway
+            };
+
+            // Handle enabled/disabled state
+            if (Enabled.IsPresent && Disabled.IsPresent)
+            {
+                WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
+                server.Enabled = "1";
+            }
+            else if (Enabled.IsPresent)
+            {
+                server.Enabled = "1";
+            }
+            else if (Disabled.IsPresent)
+            {
+                server.Enabled = "0";
+            }
+            else
+            {
+                server.Enabled = currentServer.Enabled;
+            }
+
+            // Update the server
+            var updateResult = ExecuteAsyncTask(() => dhcpService.UpdateServerAsync(Interface, server));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"DHCP server for interface {Interface} updated: {updateResult.Result}");
+
+            // Apply the changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => dhcpService.ApplyChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"DHCP changes applied: {applyResult.Status}");
             }
         }
     }

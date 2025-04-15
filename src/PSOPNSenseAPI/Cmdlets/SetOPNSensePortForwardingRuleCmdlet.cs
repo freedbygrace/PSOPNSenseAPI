@@ -15,7 +15,7 @@ namespace PSOPNSenseAPI.Cmdlets
     /// </summary>
     [Cmdlet(VerbsCommon.Set, "OPNSensePortForwardingRule", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
     [OutputType(typeof(PortForwardingRule))]
-    public class SetOPNSensePortForwardingRuleCmdlet : OPNSenseCmdlet
+    public class SetOPNSensePortForwardingRuleCmdlet : OPNSenseBaseCmdlet
     {
         /// <summary>
         /// <para type="description">The UUID of the port forwarding rule to update.</para>
@@ -118,20 +118,23 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            var portForwardingService = new PortForwardingService(SessionState.ApiClient);
+            var portForwardingService = new PortForwardingService(ApiClient);
 
             // Get the existing rule
-            var existingRule = Task.Run(async () => await portForwardingService.GetPortForwardingRuleAsync(Uuid)).GetAwaiter().GetResult();
+            var existingRule = ExecuteAsyncTask(() => portForwardingService.GetPortForwardingRuleAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null)
+            {
+                return;
+            }
 
             if (existingRule == null)
             {
-                WriteError(new ErrorRecord(
-                    new PSArgumentException($"Port forwarding rule with UUID '{Uuid}' not found."),
-                    "PortForwardingRuleNotFound",
-                    ErrorCategory.ObjectNotFound,
-                    Uuid));
+                ProcessingException = new PSArgumentException($"Port forwarding rule with UUID '{Uuid}' not found.");
+                WriteWarning($"Port forwarding rule with UUID '{Uuid}' not found.");
                 return;
             }
 
@@ -177,7 +180,13 @@ namespace PSOPNSenseAPI.Cmdlets
 
             if (Force || ShouldProcess($"OPNSense firewall", $"Update port forwarding rule with UUID '{Uuid}'"))
             {
-                var success = Task.Run(async () => await portForwardingService.UpdatePortForwardingRuleAsync(existingRule)).GetAwaiter().GetResult();
+                var success = ExecuteAsyncTask(() => portForwardingService.UpdatePortForwardingRuleAsync(existingRule));
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null)
+                {
+                    return;
+                }
 
                 if (success)
                 {
@@ -190,11 +199,8 @@ namespace PSOPNSenseAPI.Cmdlets
                 }
                 else
                 {
-                    WriteError(new ErrorRecord(
-                        new PSInvalidOperationException($"Failed to update port forwarding rule with UUID '{Uuid}'."),
-                        "PortForwardingRuleUpdateFailed",
-                        ErrorCategory.InvalidOperation,
-                        existingRule));
+                    ProcessingException = new PSInvalidOperationException($"Failed to update port forwarding rule with UUID '{Uuid}'.");
+                    WriteWarning($"Failed to update port forwarding rule with UUID '{Uuid}'.");
                 }
             }
         }

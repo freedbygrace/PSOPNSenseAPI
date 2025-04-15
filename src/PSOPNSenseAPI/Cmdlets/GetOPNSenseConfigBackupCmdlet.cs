@@ -21,21 +21,20 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
-            {
-                var configService = new ConfigService(ApiClient, Logger);
+            var configService = new ConfigService(ApiClient, Logger);
 
-                var task = Task.Run(async () => await configService.GetConfigBackupsAsync());
-                var result = task.GetAwaiter().GetResult();
+            // Use our safe execution method
+            var result = ExecuteAsyncTask(() => configService.GetConfigBackupsAsync());
 
-                WriteObject(result.Backups, true);
-            }
-            catch (Exception ex)
+            // Only continue if no exception occurred
+            if (ProcessingException != null || result == null)
             {
-                HandleException(ex);
+                return;
             }
+
+            WriteObject(result.Backups, true);
         }
     }
 }

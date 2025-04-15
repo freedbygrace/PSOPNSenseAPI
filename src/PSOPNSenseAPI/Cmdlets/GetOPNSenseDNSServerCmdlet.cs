@@ -21,32 +21,31 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var dnsService = new DNSService(ApiClient, Logger);
+
+            // Use our safe execution method
+            var result = ExecuteAsyncTask(() => dnsService.GetDNSConfigAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || result == null)
             {
-                var dnsService = new DNSService(ApiClient, Logger);
-
-                var task = Task.Run(async () => await dnsService.GetDNSConfigAsync());
-                var result = task.GetAwaiter().GetResult();
-
-                var dnsConfig = new PSObject();
-                dnsConfig.Properties.Add(new PSNoteProperty("Enabled", result.Unbound.Enabled == "1"));
-                dnsConfig.Properties.Add(new PSNoteProperty("Port", result.Unbound.Port));
-                dnsConfig.Properties.Add(new PSNoteProperty("Interfaces", result.Unbound.Interfaces));
-                dnsConfig.Properties.Add(new PSNoteProperty("Forwarding", result.Unbound.Forwarding == "1"));
-                dnsConfig.Properties.Add(new PSNoteProperty("Forwarders", result.Unbound.Forwarders));
-                dnsConfig.Properties.Add(new PSNoteProperty("RegisterDhcp", result.Unbound.RegisterDhcp == "1"));
-                dnsConfig.Properties.Add(new PSNoteProperty("RegisterDhcpDomain", result.Unbound.RegisterDhcpDomain));
-                dnsConfig.Properties.Add(new PSNoteProperty("RegisterDhcpStatic", result.Unbound.RegisterDhcpStatic == "1"));
-                dnsConfig.Properties.Add(new PSNoteProperty("ActiveInterfaces", result.Unbound.ActiveInterfaces));
-
-                WriteObject(dnsConfig);
+                return;
             }
-            catch (Exception ex)
-            {
-                HandleException(ex);
-            }
+
+            var dnsConfig = new PSObject();
+            dnsConfig.Properties.Add(new PSNoteProperty("Enabled", result.Unbound.Enabled == "1"));
+            dnsConfig.Properties.Add(new PSNoteProperty("Port", result.Unbound.Port));
+            dnsConfig.Properties.Add(new PSNoteProperty("Interfaces", result.Unbound.Interfaces));
+            dnsConfig.Properties.Add(new PSNoteProperty("Forwarding", result.Unbound.Forwarding == "1"));
+            dnsConfig.Properties.Add(new PSNoteProperty("Forwarders", result.Unbound.Forwarders));
+            dnsConfig.Properties.Add(new PSNoteProperty("RegisterDhcp", result.Unbound.RegisterDhcp == "1"));
+            dnsConfig.Properties.Add(new PSNoteProperty("RegisterDhcpDomain", result.Unbound.RegisterDhcpDomain));
+            dnsConfig.Properties.Add(new PSNoteProperty("RegisterDhcpStatic", result.Unbound.RegisterDhcpStatic == "1"));
+            dnsConfig.Properties.Add(new PSNoteProperty("ActiveInterfaces", result.Unbound.ActiveInterfaces));
+
+            WriteObject(dnsConfig);
         }
     }
 }

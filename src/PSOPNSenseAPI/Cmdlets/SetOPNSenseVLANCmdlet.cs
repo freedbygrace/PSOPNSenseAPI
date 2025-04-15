@@ -59,35 +59,40 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var interfaceService = new InterfaceService(ApiClient, Logger);
+
+            // First, get the current VLAN configuration
+            var getResult = ExecuteAsyncTask(() => interfaceService.GetVLANAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var interfaceService = new InterfaceService(ApiClient, Logger);
-
-                // First, get the current VLAN configuration
-                var getTask = Task.Run(async () => await interfaceService.GetVLANAsync(Uuid));
-                var currentVlan = getTask.GetAwaiter().GetResult().Vlan;
-
-                // Create the updated configuration
-                var vlan = new VLANConfig
-                {
-                    Interface = Interface ?? currentVlan.Interface,
-                    Tag = Tag?.ToString() ?? currentVlan.Tag,
-                    Priority = Priority?.ToString() ?? currentVlan.Priority,
-                    Description = Description ?? currentVlan.Description
-                };
-
-                // Update the VLAN
-                var updateTask = Task.Run(async () => await interfaceService.UpdateVLANAsync(Uuid, vlan));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"VLAN {Uuid} updated: {updateResult.Result}");
+                return;
             }
-            catch (Exception ex)
+
+            var currentVlan = getResult.Vlan;
+
+            // Create the updated configuration
+            var vlan = new VLANConfig
             {
-                HandleException(ex);
+                Interface = Interface ?? currentVlan.Interface,
+                Tag = Tag?.ToString() ?? currentVlan.Tag,
+                Priority = Priority?.ToString() ?? currentVlan.Priority,
+                Description = Description ?? currentVlan.Description
+            };
+
+            // Update the VLAN
+            var updateResult = ExecuteAsyncTask(() => interfaceService.UpdateVLANAsync(Uuid, vlan));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
             }
+
+            WriteVerbose($"VLAN {Uuid} updated: {updateResult.Result}");
         }
     }
 }

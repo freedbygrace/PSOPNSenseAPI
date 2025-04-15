@@ -45,44 +45,54 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var dnsService = new DNSService(ApiClient, Logger);
+
+            // Get the host details for the confirmation message
+            var getResult = ExecuteAsyncTask(() => dnsService.GetDNSForwardingHostAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var dnsService = new DNSService(ApiClient, Logger);
+                return;
+            }
 
-                // Get the host details for the confirmation message
-                var getTask = Task.Run(async () => await dnsService.GetDNSForwardingHostAsync(Uuid));
-                var host = getTask.GetAwaiter().GetResult().Host;
+            var host = getResult.Host;
 
-                string confirmMessage = $"DNS forwarding host: {host.Domain} -> {host.Server}";
-                if (!string.IsNullOrEmpty(host.Description))
-                {
-                    confirmMessage += $" ({host.Description})";
-                }
+            string confirmMessage = $"DNS forwarding host: {host.Domain} -> {host.Server}";
+            if (!string.IsNullOrEmpty(host.Description))
+            {
+                confirmMessage += $" ({host.Description})";
+            }
 
-                if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            {
+                return;
+            }
+
+            var deleteResult = ExecuteAsyncTask(() => dnsService.DeleteDNSForwardingHostAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || deleteResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"DNS forwarding host {Uuid} removed: {deleteResult.Result}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => dnsService.ApplyDNSChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
                 {
                     return;
                 }
 
-                var deleteTask = Task.Run(async () => await dnsService.DeleteDNSForwardingHostAsync(Uuid));
-                var deleteResult = deleteTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"DNS forwarding host {Uuid} removed: {deleteResult.Result}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await dnsService.ApplyDNSChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"DNS changes applied: {applyResult.Status}");
-                }
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
+                WriteVerbose($"DNS changes applied: {applyResult.Status}");
             }
         }
     }

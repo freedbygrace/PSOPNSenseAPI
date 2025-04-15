@@ -52,54 +52,60 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var aliasService = new AliasService(ApiClient, Logger);
+
+            if (ParameterSetName == "ByUuid")
             {
-                var aliasService = new AliasService(ApiClient, Logger);
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => aliasService.GetAliasAsync(Uuid));
 
-                if (ParameterSetName == "ByUuid")
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
                 {
-                    var task = Task.Run(async () => await aliasService.GetAliasAsync(Uuid));
-                    var result = task.GetAwaiter().GetResult();
-                    WriteObject(result.Alias);
+                    return;
                 }
-                else
-                {
-                    var task = Task.Run(async () => await aliasService.GetAliasesAsync());
-                    var result = task.GetAwaiter().GetResult();
 
-                    // Filter by name if specified
-                    if (ParameterSetName == "ByName")
+                WriteObject(result.Alias);
+            }
+            else
+            {
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => aliasService.GetAliasesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
+                {
+                    return;
+                }
+
+                // Filter by name if specified
+                if (ParameterSetName == "ByName")
+                {
+                    var filteredByName = result.Rows.FindAll(a => a.Name.Equals(Name, StringComparison.OrdinalIgnoreCase));
+
+                    // Further filter by type if specified
+                    if (!string.IsNullOrEmpty(Type))
                     {
-                        var filteredByName = result.Rows.FindAll(a => a.Name.Equals(Name, StringComparison.OrdinalIgnoreCase));
-                        
-                        // Further filter by type if specified
-                        if (!string.IsNullOrEmpty(Type))
-                        {
-                            var filteredByType = filteredByName.FindAll(a => a.Type.Equals(Type, StringComparison.OrdinalIgnoreCase));
-                            WriteObject(filteredByType, true);
-                        }
-                        else
-                        {
-                            WriteObject(filteredByName, true);
-                        }
-                    }
-                    // Filter by type if specified
-                    else if (!string.IsNullOrEmpty(Type))
-                    {
-                        var filteredByType = result.Rows.FindAll(a => a.Type.Equals(Type, StringComparison.OrdinalIgnoreCase));
+                        var filteredByType = filteredByName.FindAll(a => a.Type.Equals(Type, StringComparison.OrdinalIgnoreCase));
                         WriteObject(filteredByType, true);
                     }
                     else
                     {
-                        WriteObject(result.Rows, true);
+                        WriteObject(filteredByName, true);
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
+                // Filter by type if specified
+                else if (!string.IsNullOrEmpty(Type))
+                {
+                    var filteredByType = result.Rows.FindAll(a => a.Type.Equals(Type, StringComparison.OrdinalIgnoreCase));
+                    WriteObject(filteredByType, true);
+                }
+                else
+                {
+                    WriteObject(result.Rows, true);
+                }
             }
         }
     }

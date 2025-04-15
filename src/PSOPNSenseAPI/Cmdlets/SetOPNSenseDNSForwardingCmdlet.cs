@@ -58,69 +58,79 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var dnsService = new DNSService(ApiClient, Logger);
+
+            // Get current configuration
+            var getResult = ExecuteAsyncTask(() => dnsService.GetDNSForwardingAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var dnsService = new DNSService(ApiClient, Logger);
-
-                // Get current configuration
-                var getTask = Task.Run(async () => await dnsService.GetDNSForwardingAsync());
-                var currentConfig = getTask.GetAwaiter().GetResult().Forward;
-
-                // Create updated configuration
-                var config = new DNSForwardingConfig
-                {
-                    Type = Type ?? currentConfig.Type
-                };
-
-                // Handle enabled/disabled state
-                if (Enabled.IsPresent && Disabled.IsPresent)
-                {
-                    WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
-                    config.Enabled = "1";
-                }
-                else if (Enabled.IsPresent)
-                {
-                    config.Enabled = "1";
-                }
-                else if (Disabled.IsPresent)
-                {
-                    config.Enabled = "0";
-                }
-                else
-                {
-                    config.Enabled = currentConfig.Enabled;
-                }
-
-                // Handle DNS servers
-                if (DnsServers != null && DnsServers.Length > 0)
-                {
-                    config.DnsServers = new List<string>(DnsServers);
-                }
-                else
-                {
-                    config.DnsServers = currentConfig.DnsServers;
-                }
-
-                // Update configuration
-                var updateTask = Task.Run(async () => await dnsService.UpdateDNSForwardingAsync(config));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"DNS forwarding configuration updated: {updateResult.Result}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await dnsService.ApplyDNSChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"DNS changes applied: {applyResult.Status}");
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var currentConfig = getResult.Forward;
+
+            // Create updated configuration
+            var config = new DNSForwardingConfig
             {
-                HandleException(ex);
+                Type = Type ?? currentConfig.Type
+            };
+
+            // Handle enabled/disabled state
+            if (Enabled.IsPresent && Disabled.IsPresent)
+            {
+                WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
+                config.Enabled = "1";
+            }
+            else if (Enabled.IsPresent)
+            {
+                config.Enabled = "1";
+            }
+            else if (Disabled.IsPresent)
+            {
+                config.Enabled = "0";
+            }
+            else
+            {
+                config.Enabled = currentConfig.Enabled;
+            }
+
+            // Handle DNS servers
+            if (DnsServers != null && DnsServers.Length > 0)
+            {
+                config.DnsServers = new List<string>(DnsServers);
+            }
+            else
+            {
+                config.DnsServers = currentConfig.DnsServers;
+            }
+
+            // Update configuration
+            var updateResult = ExecuteAsyncTask(() => dnsService.UpdateDNSForwardingAsync(config));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"DNS forwarding configuration updated: {updateResult.Result}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => dnsService.ApplyDNSChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"DNS changes applied: {applyResult.Status}");
             }
         }
     }

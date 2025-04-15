@@ -94,83 +94,93 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var aliasService = new AliasService(ApiClient, Logger);
+
+            // Get current alias
+            var getResult = ExecuteAsyncTask(() => aliasService.GetAliasAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var aliasService = new AliasService(ApiClient, Logger);
-
-                // Get current alias
-                var getTask = Task.Run(async () => await aliasService.GetAliasAsync(Uuid));
-                var currentAlias = getTask.GetAwaiter().GetResult().Alias;
-
-                // Create updated alias
-                var alias = new AliasConfig
-                {
-                    Name = currentAlias.Name,
-                    Type = currentAlias.Type,
-                    Content = Content ?? currentAlias.Content,
-                    Description = Description ?? currentAlias.Description,
-                    Protocol = Protocol?.ToUpper() ?? currentAlias.Protocol,
-                    UpdateFrequency = UpdateFrequency?.ToString() ?? currentAlias.UpdateFrequency,
-                };
-
-                // Handle enabled/disabled state
-                if (Enabled.IsPresent && Disabled.IsPresent)
-                {
-                    WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
-                    alias.Enabled = "1";
-                }
-                else if (Enabled.IsPresent)
-                {
-                    alias.Enabled = "1";
-                }
-                else if (Disabled.IsPresent)
-                {
-                    alias.Enabled = "0";
-                }
-                else
-                {
-                    alias.Enabled = currentAlias.Enabled;
-                }
-
-                // Handle counters
-                if (EnableCounters.IsPresent && DisableCounters.IsPresent)
-                {
-                    WriteWarning("Both -EnableCounters and -DisableCounters parameters were specified. Using -EnableCounters.");
-                    alias.Counters = "1";
-                }
-                else if (EnableCounters.IsPresent)
-                {
-                    alias.Counters = "1";
-                }
-                else if (DisableCounters.IsPresent)
-                {
-                    alias.Counters = "0";
-                }
-                else
-                {
-                    alias.Counters = currentAlias.Counters;
-                }
-
-                // Update alias
-                var updateTask = Task.Run(async () => await aliasService.UpdateAliasAsync(Uuid, alias));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Alias {Uuid} updated: {updateResult.Result}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await aliasService.ReconfigureAliasesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"Alias changes applied: {applyResult.Status}");
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var currentAlias = getResult.Alias;
+
+            // Create updated alias
+            var alias = new AliasConfig
             {
-                HandleException(ex);
+                Name = currentAlias.Name,
+                Type = currentAlias.Type,
+                Content = Content ?? currentAlias.Content,
+                Description = Description ?? currentAlias.Description,
+                Protocol = Protocol?.ToUpper() ?? currentAlias.Protocol,
+                UpdateFrequency = UpdateFrequency?.ToString() ?? currentAlias.UpdateFrequency,
+            };
+
+            // Handle enabled/disabled state
+            if (Enabled.IsPresent && Disabled.IsPresent)
+            {
+                WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
+                alias.Enabled = "1";
+            }
+            else if (Enabled.IsPresent)
+            {
+                alias.Enabled = "1";
+            }
+            else if (Disabled.IsPresent)
+            {
+                alias.Enabled = "0";
+            }
+            else
+            {
+                alias.Enabled = currentAlias.Enabled;
+            }
+
+            // Handle counters
+            if (EnableCounters.IsPresent && DisableCounters.IsPresent)
+            {
+                WriteWarning("Both -EnableCounters and -DisableCounters parameters were specified. Using -EnableCounters.");
+                alias.Counters = "1";
+            }
+            else if (EnableCounters.IsPresent)
+            {
+                alias.Counters = "1";
+            }
+            else if (DisableCounters.IsPresent)
+            {
+                alias.Counters = "0";
+            }
+            else
+            {
+                alias.Counters = currentAlias.Counters;
+            }
+
+            // Update alias
+            var updateResult = ExecuteAsyncTask(() => aliasService.UpdateAliasAsync(Uuid, alias));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Alias {Uuid} updated: {updateResult.Result}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => aliasService.ReconfigureAliasesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"Alias changes applied: {applyResult.Status}");
             }
         }
     }

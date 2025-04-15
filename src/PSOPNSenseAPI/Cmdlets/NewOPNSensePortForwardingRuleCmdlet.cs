@@ -15,7 +15,7 @@ namespace PSOPNSenseAPI.Cmdlets
     /// </summary>
     [Cmdlet(VerbsCommon.New, "OPNSensePortForwardingRule", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.Medium)]
     [OutputType(typeof(PortForwardingRule))]
-    public class NewOPNSensePortForwardingRuleCmdlet : OPNSenseCmdlet
+    public class NewOPNSensePortForwardingRuleCmdlet : OPNSenseBaseCmdlet
     {
         /// <summary>
         /// <para type="description">Whether the rule is enabled.</para>
@@ -106,7 +106,7 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
             var rule = new PortForwardingRule
             {
@@ -127,8 +127,16 @@ namespace PSOPNSenseAPI.Cmdlets
 
             if (Force || ShouldProcess($"OPNSense firewall", $"Create port forwarding rule from {Destination}:{DestinationPort} to {TargetIP}:{TargetPort}"))
             {
-                var portForwardingService = new PortForwardingService(SessionState.ApiClient);
-                var uuid = Task.Run(async () => await portForwardingService.CreatePortForwardingRuleAsync(rule)).GetAwaiter().GetResult();
+                var portForwardingService = new PortForwardingService(ApiClient);
+
+                // Use our safe execution method
+                var uuid = ExecuteAsyncTask(() => portForwardingService.CreatePortForwardingRuleAsync(rule));
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null)
+                {
+                    return;
+                }
 
                 if (!string.IsNullOrEmpty(uuid))
                 {
@@ -138,11 +146,8 @@ namespace PSOPNSenseAPI.Cmdlets
                 }
                 else
                 {
-                    WriteError(new ErrorRecord(
-                        new PSInvalidOperationException("Failed to create port forwarding rule."),
-                        "PortForwardingRuleCreationFailed",
-                        ErrorCategory.InvalidOperation,
-                        null));
+                    ProcessingException = new PSInvalidOperationException("Failed to create port forwarding rule.");
+                    WriteWarning("Failed to create port forwarding rule.");
                 }
             }
         }

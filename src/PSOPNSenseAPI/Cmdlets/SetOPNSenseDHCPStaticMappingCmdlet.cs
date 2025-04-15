@@ -82,62 +82,72 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var dhcpService = new DHCPService(ApiClient, Logger);
+
+            // First, get the current mapping
+            var getResult = ExecuteAsyncTask(() => dhcpService.GetStaticMappingAsync(Interface, Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var dhcpService = new DHCPService(ApiClient, Logger);
-
-                // First, get the current mapping
-                var getTask = Task.Run(async () => await dhcpService.GetStaticMappingAsync(Interface, Uuid));
-                var currentMapping = getTask.GetAwaiter().GetResult().Mapping;
-
-                // Create the updated mapping
-                var mapping = new DHCPStaticMappingConfig
-                {
-                    MacAddress = MacAddress ?? currentMapping.MacAddress,
-                    IpAddress = IpAddress ?? currentMapping.IpAddress,
-                    Hostname = Hostname ?? currentMapping.Hostname,
-                    Description = Description ?? currentMapping.Description
-                };
-
-                // Handle enabled/disabled state
-                if (Enabled.IsPresent && Disabled.IsPresent)
-                {
-                    WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
-                    mapping.Enabled = "1";
-                }
-                else if (Enabled.IsPresent)
-                {
-                    mapping.Enabled = "1";
-                }
-                else if (Disabled.IsPresent)
-                {
-                    mapping.Enabled = "0";
-                }
-                else
-                {
-                    mapping.Enabled = currentMapping.Enabled;
-                }
-
-                // Update the mapping
-                var updateTask = Task.Run(async () => await dhcpService.UpdateStaticMappingAsync(Interface, Uuid, mapping));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Static mapping {Uuid} updated: {updateResult.Result}");
-
-                // Apply the changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await dhcpService.ApplyChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-                    
-                    WriteVerbose($"DHCP changes applied: {applyResult.Status}");
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var currentMapping = getResult.Mapping;
+
+            // Create the updated mapping
+            var mapping = new DHCPStaticMappingConfig
             {
-                HandleException(ex);
+                MacAddress = MacAddress ?? currentMapping.MacAddress,
+                IpAddress = IpAddress ?? currentMapping.IpAddress,
+                Hostname = Hostname ?? currentMapping.Hostname,
+                Description = Description ?? currentMapping.Description
+            };
+
+            // Handle enabled/disabled state
+            if (Enabled.IsPresent && Disabled.IsPresent)
+            {
+                WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
+                mapping.Enabled = "1";
+            }
+            else if (Enabled.IsPresent)
+            {
+                mapping.Enabled = "1";
+            }
+            else if (Disabled.IsPresent)
+            {
+                mapping.Enabled = "0";
+            }
+            else
+            {
+                mapping.Enabled = currentMapping.Enabled;
+            }
+
+            // Update the mapping
+            var updateResult = ExecuteAsyncTask(() => dhcpService.UpdateStaticMappingAsync(Interface, Uuid, mapping));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Static mapping {Uuid} updated: {updateResult.Result}");
+
+            // Apply the changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => dhcpService.ApplyChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"DHCP changes applied: {applyResult.Status}");
             }
         }
     }

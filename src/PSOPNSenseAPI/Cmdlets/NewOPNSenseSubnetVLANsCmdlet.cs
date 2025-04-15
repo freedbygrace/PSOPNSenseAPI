@@ -99,199 +99,219 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            // Parse the network CIDR
+            var ipNetwork = IPNetwork2.Parse(Network);
+
+            // Validate subnet mask bits
+            if (SubnetMaskBits <= ipNetwork.Cidr)
             {
-                // Parse the network CIDR
-                var ipNetwork = IPNetwork2.Parse(Network);
+                ProcessingException = new ArgumentException($"Subnet mask bits ({SubnetMaskBits}) must be greater than the network CIDR ({ipNetwork.Cidr}).");
+                WriteWarning($"Subnet mask bits ({SubnetMaskBits}) must be greater than the network CIDR ({ipNetwork.Cidr}).");
+                return;
+            }
 
-                // Validate subnet mask bits
-                if (SubnetMaskBits <= ipNetwork.Cidr)
+            // Calculate the number of subnets
+            int numSubnets = (int)Math.Pow(2, SubnetMaskBits - ipNetwork.Cidr);
+
+            // Calculate the maximum VLAN ID
+            int maxVlanId = StartingVlanId + (numSubnets - 1) * VlanIdIncrement;
+
+            // Validate the maximum VLAN ID
+            if (maxVlanId > 4094)
+            {
+                ProcessingException = new ArgumentException($"The maximum VLAN ID ({maxVlanId}) exceeds the maximum allowed value (4094).");
+                WriteWarning($"The maximum VLAN ID ({maxVlanId}) exceeds the maximum allowed value (4094).");
+                return;
+            }
+
+            // Get confirmation
+            if (!Force.IsPresent && !ShouldProcess($"Create {numSubnets} VLANs for subnets of {Network} with VLAN IDs {StartingVlanId}-{maxVlanId}", "New-OPNSenseSubnetVLANs"))
+            {
+                return;
+            }
+
+            // Get the interface service
+            var interfaceService = new InterfaceService(ApiClient, Logger);
+
+            // Verify the parent interface exists
+            var interfaceDetail = ExecuteAsyncTask(() => interfaceService.GetInterfaceDetailAsync(ParentInterface));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null)
+            {
+                return;
+            }
+
+            // Get existing VLANs
+            var vlansResult = ExecuteAsyncTask(() => interfaceService.GetVLANsAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || vlansResult == null)
+            {
+                return;
+            }
+
+            var existingVlans = vlansResult.Rows;
+
+            // Create a list to store the created VLANs
+            var createdVlans = new List<PSObject>();
+
+            // Get DHCP service if needed
+            DHCPService dhcpService = null;
+            if (EnableDHCP.IsPresent)
+            {
+                dhcpService = new DHCPService(ApiClient, Logger);
+            }
+
+            // Divide the network into subnets
+            var subnets = ipNetwork.Subnet((byte)SubnetMaskBits);
+            int vlanId = StartingVlanId;
+            int subnetIndex = 0;
+
+            foreach (var subnet in subnets)
+            {
+                // Calculate the gateway IP (first host address)
+                var gatewayIp = GetFirstHostAddress(subnet);
+
+                // Calculate the DHCP range (second host address to last host address)
+                var dhcpStart = GetSecondHostAddress(subnet);
+                var dhcpEnd = GetLastHostAddress(subnet);
+
+                // Create a description for the VLAN
+                string description = $"{DescriptionPrefix} {vlanId} - {subnet}";
+
+                // Check if the VLAN already exists
+                var existingVlan = existingVlans.FirstOrDefault(v =>
+                    v.Interface == ParentInterface &&
+                    int.Parse(v.Tag) == vlanId);
+
+                if (existingVlan != null)
                 {
-                    WriteError(new ErrorRecord(
-                        new ArgumentException($"Subnet mask bits ({SubnetMaskBits}) must be greater than the network CIDR ({ipNetwork.Cidr})."),
-                        "InvalidSubnetMaskBits",
-                        ErrorCategory.InvalidArgument,
-                        SubnetMaskBits));
-                    return;
+                    WriteVerbose($"VLAN {vlanId} already exists on interface {ParentInterface}");
+
+                    // Add the existing VLAN to the list
+                    var vlanInfo = new PSObject();
+                    vlanInfo.Properties.Add(new PSNoteProperty("VlanId", vlanId));
+                    vlanInfo.Properties.Add(new PSNoteProperty("Subnet", subnet.ToString()));
+                    vlanInfo.Properties.Add(new PSNoteProperty("Gateway", gatewayIp.ToString()));
+                    vlanInfo.Properties.Add(new PSNoteProperty("Uuid", existingVlan.Uuid));
+                    vlanInfo.Properties.Add(new PSNoteProperty("Status", "Existing"));
+
+                    createdVlans.Add(vlanInfo);
                 }
-
-                // Calculate the number of subnets
-                int numSubnets = (int)Math.Pow(2, SubnetMaskBits - ipNetwork.Cidr);
-
-                // Calculate the maximum VLAN ID
-                int maxVlanId = StartingVlanId + (numSubnets - 1) * VlanIdIncrement;
-
-                // Validate the maximum VLAN ID
-                if (maxVlanId > 4094)
+                else
                 {
-                    WriteError(new ErrorRecord(
-                        new ArgumentException($"The maximum VLAN ID ({maxVlanId}) exceeds the maximum allowed value (4094)."),
-                        "InvalidVlanIdRange",
-                        ErrorCategory.InvalidArgument,
-                        maxVlanId));
-                    return;
-                }
-
-                // Get confirmation
-                if (!Force.IsPresent && !ShouldProcess($"Create {numSubnets} VLANs for subnets of {Network} with VLAN IDs {StartingVlanId}-{maxVlanId}", "New-OPNSenseSubnetVLANs"))
-                {
-                    return;
-                }
-
-                // Get the interface service
-                var interfaceService = new InterfaceService(ApiClient, Logger);
-
-                // Verify the parent interface exists
-                var getInterfaceTask = Task.Run(async () => await interfaceService.GetInterfaceDetailAsync(ParentInterface));
-                getInterfaceTask.GetAwaiter().GetResult();
-
-                // Get existing VLANs
-                var getVlansTask = Task.Run(async () => await interfaceService.GetVLANsAsync());
-                var existingVlans = getVlansTask.GetAwaiter().GetResult().Rows;
-
-                // Create a list to store the created VLANs
-                var createdVlans = new List<PSObject>();
-
-                // Get DHCP service if needed
-                DHCPService dhcpService = null;
-                if (EnableDHCP.IsPresent)
-                {
-                    dhcpService = new DHCPService(ApiClient, Logger);
-                }
-
-                // Divide the network into subnets
-                var subnets = ipNetwork.Subnet((byte)SubnetMaskBits);
-                int vlanId = StartingVlanId;
-                int subnetIndex = 0;
-
-                foreach (var subnet in subnets)
-                {
-                    // Calculate the gateway IP (first host address)
-                    var gatewayIp = GetFirstHostAddress(subnet);
-
-                    // Calculate the DHCP range (second host address to last host address)
-                    var dhcpStart = GetSecondHostAddress(subnet);
-                    var dhcpEnd = GetLastHostAddress(subnet);
-
-                    // Create a description for the VLAN
-                    string description = $"{DescriptionPrefix} {vlanId} - {subnet}";
-
-                    // Check if the VLAN already exists
-                    var existingVlan = existingVlans.FirstOrDefault(v =>
-                        v.Interface == ParentInterface &&
-                        int.Parse(v.Tag) == vlanId);
-
-                    if (existingVlan != null)
+                    // Create the VLAN
+                    var vlanConfig = new VLANConfig
                     {
-                        WriteVerbose($"VLAN {vlanId} already exists on interface {ParentInterface}");
+                        Interface = ParentInterface,
+                        Tag = vlanId.ToString(),
+                        Priority = "0",
+                        Description = description
+                    };
 
-                        // Add the existing VLAN to the list
-                        var vlanInfo = new PSObject();
-                        vlanInfo.Properties.Add(new PSNoteProperty("VlanId", vlanId));
-                        vlanInfo.Properties.Add(new PSNoteProperty("Subnet", subnet.ToString()));
-                        vlanInfo.Properties.Add(new PSNoteProperty("Gateway", gatewayIp.ToString()));
-                        vlanInfo.Properties.Add(new PSNoteProperty("Uuid", existingVlan.Uuid));
-                        vlanInfo.Properties.Add(new PSNoteProperty("Status", "Existing"));
+                    var createVlanResult = ExecuteAsyncTask(() => interfaceService.CreateVLANAsync(vlanConfig));
 
-                        createdVlans.Add(vlanInfo);
-                    }
-                    else
+                    // Only continue if no exception occurred
+                    if (ProcessingException != null || createVlanResult == null)
                     {
-                        // Create the VLAN
-                        var vlanConfig = new VLANConfig
-                        {
-                            Interface = ParentInterface,
-                            Tag = vlanId.ToString(),
-                            Priority = "0",
-                            Description = description
-                        };
-
-                        var createVlanTask = Task.Run(async () => await interfaceService.CreateVLANAsync(vlanConfig));
-                        var createVlanResult = createVlanTask.GetAwaiter().GetResult();
-
-                        WriteVerbose($"Created VLAN {vlanId} on interface {ParentInterface} with UUID {createVlanResult.Uuid}");
-
-                        // Configure the VLAN interface
-                        string vlanInterfaceName = $"{ParentInterface}.{vlanId}";
-
-                        var interfaceConfig = new InterfaceConfig
-                        {
-                            Description = description,
-                            IpAddress = gatewayIp.ToString(),
-                            SubnetMask = SubnetMaskBits.ToString(),
-                            Enabled = "1"
-                        };
-
-                        var updateInterfaceTask = Task.Run(async () => await interfaceService.UpdateInterfaceAsync(vlanInterfaceName, interfaceConfig));
-                        updateInterfaceTask.GetAwaiter().GetResult();
-
-                        WriteVerbose($"Configured interface {vlanInterfaceName} with IP {gatewayIp}/{SubnetMaskBits}");
-
-                        // If EnableDHCP is specified, configure DHCP for the interface
-                        if (EnableDHCP.IsPresent && dhcpService != null)
-                        {
-                            // Configure DHCP server for the interface
-                            var dhcpConfig = new DHCPServerConfig
-                            {
-                                Enabled = "1",
-                                RangeFrom = dhcpStart.ToString(),
-                                RangeTo = dhcpEnd.ToString(),
-                                DefaultLeaseTime = "7200",
-                                MaxLeaseTime = "86400",
-                                Domain = Domain,
-                                Gateway = gatewayIp.ToString(),
-                                DnsServers = DnsServers != null ? new List<string>(DnsServers) : new List<string> { gatewayIp.ToString() }
-                            };
-
-                            var updateDhcpTask = Task.Run(async () => await dhcpService.UpdateServerAsync(vlanInterfaceName, dhcpConfig));
-                            updateDhcpTask.GetAwaiter().GetResult();
-
-                            WriteVerbose($"Configured DHCP server for interface {vlanInterfaceName} with range {dhcpStart} - {dhcpEnd}");
-                        }
-
-                        // Add the created VLAN to the list
-                        var vlanInfo = new PSObject();
-                        vlanInfo.Properties.Add(new PSNoteProperty("VlanId", vlanId));
-                        vlanInfo.Properties.Add(new PSNoteProperty("Subnet", subnet.ToString()));
-                        vlanInfo.Properties.Add(new PSNoteProperty("Gateway", gatewayIp.ToString()));
-                        vlanInfo.Properties.Add(new PSNoteProperty("Uuid", createVlanResult.Uuid));
-                        vlanInfo.Properties.Add(new PSNoteProperty("Status", "Created"));
-                        if (EnableDHCP.IsPresent)
-                        {
-                            vlanInfo.Properties.Add(new PSNoteProperty("DHCPRange", $"{dhcpStart} - {dhcpEnd}"));
-                        }
-
-                        createdVlans.Add(vlanInfo);
+                        return;
                     }
 
-                    // Increment the VLAN ID
-                    vlanId += VlanIdIncrement;
-                    subnetIndex++;
+                    WriteVerbose($"Created VLAN {vlanId} on interface {ParentInterface} with UUID {createVlanResult.Uuid}");
+
+                    // Configure the VLAN interface
+                    string vlanInterfaceName = $"{ParentInterface}.{vlanId}";
+
+                    var interfaceConfig = new InterfaceConfig
+                    {
+                        Description = description,
+                        IpAddress = gatewayIp.ToString(),
+                        SubnetMask = SubnetMaskBits.ToString(),
+                        Enabled = "1"
+                    };
+
+                    var updateInterfaceResult = ExecuteAsyncTask(() => interfaceService.UpdateInterfaceAsync(vlanInterfaceName, interfaceConfig));
+
+                    // Only continue if no exception occurred
+                    if (ProcessingException != null)
+                    {
+                        return;
+                    }
+
+                    WriteVerbose($"Configured interface {vlanInterfaceName} with IP {gatewayIp}/{SubnetMaskBits}");
+
+                    // If EnableDHCP is specified, configure DHCP for the interface
+                    if (EnableDHCP.IsPresent && dhcpService != null)
+                    {
+                        // Configure DHCP server for the interface
+                        var dhcpConfig = new DHCPServerConfig
+                        {
+                            Enabled = "1",
+                            RangeFrom = dhcpStart.ToString(),
+                            RangeTo = dhcpEnd.ToString(),
+                            DefaultLeaseTime = "7200",
+                            MaxLeaseTime = "86400",
+                            Domain = Domain,
+                            Gateway = gatewayIp.ToString(),
+                            DnsServers = DnsServers != null ? new List<string>(DnsServers) : new List<string> { gatewayIp.ToString() }
+                        };
+
+                        var updateDhcpResult = ExecuteAsyncTask(() => dhcpService.UpdateServerAsync(vlanInterfaceName, dhcpConfig));
+
+                        // Only continue if no exception occurred
+                        if (ProcessingException != null)
+                        {
+                            return;
+                        }
+
+                        WriteVerbose($"Configured DHCP server for interface {vlanInterfaceName} with range {dhcpStart} - {dhcpEnd}");
+                    }
+
+                    // Add the created VLAN to the list
+                    var vlanInfo = new PSObject();
+                    vlanInfo.Properties.Add(new PSNoteProperty("VlanId", vlanId));
+                    vlanInfo.Properties.Add(new PSNoteProperty("Subnet", subnet.ToString()));
+                    vlanInfo.Properties.Add(new PSNoteProperty("Gateway", gatewayIp.ToString()));
+                    vlanInfo.Properties.Add(new PSNoteProperty("Uuid", createVlanResult.Uuid));
+                    vlanInfo.Properties.Add(new PSNoteProperty("Status", "Created"));
+                    if (EnableDHCP.IsPresent)
+                    {
+                        vlanInfo.Properties.Add(new PSNoteProperty("DHCPRange", $"{dhcpStart} - {dhcpEnd}"));
+                    }
+
+                    createdVlans.Add(vlanInfo);
                 }
 
-                // Apply DHCP changes if needed
-                if (EnableDHCP.IsPresent && dhcpService != null)
-                {
-                    var applyDhcpTask = Task.Run(async () => await dhcpService.ApplyChangesAsync());
-                    var applyDhcpResult = applyDhcpTask.GetAwaiter().GetResult();
-                    WriteVerbose($"Applied DHCP changes: {applyDhcpResult.Status}");
-                }
-
-                // Create a result object
-                var result = new PSObject();
-                result.Properties.Add(new PSNoteProperty("ParentInterface", ParentInterface));
-                result.Properties.Add(new PSNoteProperty("Network", Network));
-                result.Properties.Add(new PSNoteProperty("SubnetMaskBits", SubnetMaskBits));
-                result.Properties.Add(new PSNoteProperty("VLANs", createdVlans));
-
-                WriteObject(result);
+                // Increment the VLAN ID
+                vlanId += VlanIdIncrement;
+                subnetIndex++;
             }
-            catch (Exception ex)
+
+            // Apply DHCP changes if needed
+            if (EnableDHCP.IsPresent && dhcpService != null)
             {
-                HandleException(ex);
+                var applyDhcpResult = ExecuteAsyncTask(() => dhcpService.ApplyChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyDhcpResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"Applied DHCP changes: {applyDhcpResult.Status}");
             }
+
+            // Create a result object
+            var result = new PSObject();
+            result.Properties.Add(new PSNoteProperty("ParentInterface", ParentInterface));
+            result.Properties.Add(new PSNoteProperty("Network", Network));
+            result.Properties.Add(new PSNoteProperty("SubnetMaskBits", SubnetMaskBits));
+            result.Properties.Add(new PSNoteProperty("VLANs", createdVlans));
+
+            WriteObject(result);
         }
 
         /// <summary>

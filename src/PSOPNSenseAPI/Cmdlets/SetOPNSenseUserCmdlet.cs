@@ -76,56 +76,61 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var userService = new UserService(ApiClient, Logger);
+
+            // First, get the current user
+            var getResult = ExecuteAsyncTask(() => userService.GetUserAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var userService = new UserService(ApiClient, Logger);
-
-                // First, get the current user
-                var getTask = Task.Run(async () => await userService.GetUserAsync(Uuid));
-                var currentUser = getTask.GetAwaiter().GetResult().User;
-
-                // Create the updated user
-                var user = new UserConfig
-                {
-                    Username = currentUser.Username,
-                    Password = Password ?? "",
-                    FullName = FullName ?? currentUser.FullName,
-                    Email = Email ?? currentUser.Email,
-                    Groups = Groups != null ? new List<string>(Groups) : currentUser.Groups,
-                    Authorizations = Authorizations != null ? new List<string>(Authorizations) : currentUser.Authorizations
-                };
-
-                // Handle enabled/disabled state
-                if (Enabled.IsPresent && Disabled.IsPresent)
-                {
-                    WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
-                    user.Disabled = "0";
-                }
-                else if (Enabled.IsPresent)
-                {
-                    user.Disabled = "0";
-                }
-                else if (Disabled.IsPresent)
-                {
-                    user.Disabled = "1";
-                }
-                else
-                {
-                    user.Disabled = currentUser.Disabled;
-                }
-
-                // Update the user
-                var updateTask = Task.Run(async () => await userService.UpdateUserAsync(Uuid, user));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"User {Uuid} updated: {updateResult.Result}");
+                return;
             }
-            catch (Exception ex)
+
+            var currentUser = getResult.User;
+
+            // Create the updated user
+            var user = new UserConfig
             {
-                HandleException(ex);
+                Username = currentUser.Username,
+                Password = Password ?? "",
+                FullName = FullName ?? currentUser.FullName,
+                Email = Email ?? currentUser.Email,
+                Groups = Groups != null ? new List<string>(Groups) : currentUser.Groups,
+                Authorizations = Authorizations != null ? new List<string>(Authorizations) : currentUser.Authorizations
+            };
+
+            // Handle enabled/disabled state
+            if (Enabled.IsPresent && Disabled.IsPresent)
+            {
+                WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
+                user.Disabled = "0";
             }
+            else if (Enabled.IsPresent)
+            {
+                user.Disabled = "0";
+            }
+            else if (Disabled.IsPresent)
+            {
+                user.Disabled = "1";
+            }
+            else
+            {
+                user.Disabled = currentUser.Disabled;
+            }
+
+            // Update the user
+            var updateResult = ExecuteAsyncTask(() => userService.UpdateUserAsync(Uuid, user));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"User {Uuid} updated: {updateResult.Result}");
         }
     }
 }

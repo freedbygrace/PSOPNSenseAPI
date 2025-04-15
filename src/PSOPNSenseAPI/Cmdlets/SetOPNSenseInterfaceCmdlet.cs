@@ -87,44 +87,54 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var interfaceService = new InterfaceService(ApiClient, Logger);
+
+            // First, get the current interface configuration
+            var getResult = ExecuteAsyncTask(() => interfaceService.GetInterfaceDetailAsync(Name));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var interfaceService = new InterfaceService(ApiClient, Logger);
-
-                // First, get the current interface configuration
-                var getTask = Task.Run(async () => await interfaceService.GetInterfaceDetailAsync(Name));
-                var currentInterface = getTask.GetAwaiter().GetResult().Interface;
-
-                // Create the updated configuration
-                var interfaceConfig = new InterfaceConfig
-                {
-                    Description = Description ?? currentInterface.Description,
-                    IpAddress = IpAddress ?? currentInterface.IpAddress,
-                    SubnetMask = SubnetMask ?? currentInterface.SubnetMask,
-                    Gateway = Gateway ?? currentInterface.Gateway,
-                    Enabled = Enabled.IsPresent ? "1" : "0"
-                };
-
-                // Update the interface
-                var updateTask = Task.Run(async () => await interfaceService.UpdateInterfaceAsync(Name, interfaceConfig));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Interface {Name} updated: {updateResult.Result}");
-
-                // Apply the changes if requested
-                if (Apply.IsPresent)
-                {
-                    var restartTask = Task.Run(async () => await interfaceService.RestartInterfaceAsync(Name));
-                    var restartResult = restartTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"Interface {Name} restarted: {restartResult.Status}");
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var currentInterface = getResult.Interface;
+
+            // Create the updated configuration
+            var interfaceConfig = new InterfaceConfig
             {
-                HandleException(ex);
+                Description = Description ?? currentInterface.Description,
+                IpAddress = IpAddress ?? currentInterface.IpAddress,
+                SubnetMask = SubnetMask ?? currentInterface.SubnetMask,
+                Gateway = Gateway ?? currentInterface.Gateway,
+                Enabled = Enabled.IsPresent ? "1" : "0"
+            };
+
+            // Update the interface
+            var updateResult = ExecuteAsyncTask(() => interfaceService.UpdateInterfaceAsync(Name, interfaceConfig));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Interface {Name} updated: {updateResult.Result}");
+
+            // Apply the changes if requested
+            if (Apply.IsPresent)
+            {
+                var restartResult = ExecuteAsyncTask(() => interfaceService.RestartInterfaceAsync(Name));
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || restartResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"Interface {Name} restarted: {restartResult.Status}");
             }
         }
     }

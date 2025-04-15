@@ -82,48 +82,58 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var dnsService = new DNSService(ApiClient, Logger);
+
+            // First, get the current DNS configuration
+            var getResult = ExecuteAsyncTask(() => dnsService.GetDNSConfigAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var dnsService = new DNSService(ApiClient, Logger);
-
-                // First, get the current DNS configuration
-                var getTask = Task.Run(async () => await dnsService.GetDNSConfigAsync());
-                var currentConfig = getTask.GetAwaiter().GetResult().Unbound;
-
-                // Create the updated configuration
-                var dnsConfig = new DNSConfig
-                {
-                    Enabled = MyInvocation.BoundParameters.ContainsKey(nameof(Enabled)) ? (Enabled.IsPresent ? "1" : "0") : currentConfig.Enabled,
-                    Port = Port?.ToString() ?? currentConfig.Port,
-                    Interfaces = Interfaces != null ? new List<string>(Interfaces) : currentConfig.Interfaces,
-                    Forwarding = MyInvocation.BoundParameters.ContainsKey(nameof(Forwarding)) ? (Forwarding.IsPresent ? "1" : "0") : currentConfig.Forwarding,
-                    Forwarders = Forwarders != null ? new List<string>(Forwarders) : currentConfig.Forwarders,
-                    RegisterDhcp = MyInvocation.BoundParameters.ContainsKey(nameof(RegisterDhcp)) ? (RegisterDhcp.IsPresent ? "1" : "0") : currentConfig.RegisterDhcp,
-                    RegisterDhcpDomain = RegisterDhcpDomain ?? currentConfig.RegisterDhcpDomain,
-                    RegisterDhcpStatic = MyInvocation.BoundParameters.ContainsKey(nameof(RegisterDhcpStatic)) ? (RegisterDhcpStatic.IsPresent ? "1" : "0") : currentConfig.RegisterDhcpStatic,
-                    ActiveInterfaces = currentConfig.ActiveInterfaces
-                };
-
-                // Update the DNS configuration
-                var updateTask = Task.Run(async () => await dnsService.UpdateDNSConfigAsync(dnsConfig));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"DNS server configuration updated: {updateResult.Result}");
-
-                // Apply the changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await dnsService.ApplyDNSChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-                    
-                    WriteVerbose($"DNS changes applied: {applyResult.Status}");
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var currentConfig = getResult.Unbound;
+
+            // Create the updated configuration
+            var dnsConfig = new DNSConfig
             {
-                HandleException(ex);
+                Enabled = MyInvocation.BoundParameters.ContainsKey(nameof(Enabled)) ? (Enabled.IsPresent ? "1" : "0") : currentConfig.Enabled,
+                Port = Port?.ToString() ?? currentConfig.Port,
+                Interfaces = Interfaces != null ? new List<string>(Interfaces) : currentConfig.Interfaces,
+                Forwarding = MyInvocation.BoundParameters.ContainsKey(nameof(Forwarding)) ? (Forwarding.IsPresent ? "1" : "0") : currentConfig.Forwarding,
+                Forwarders = Forwarders != null ? new List<string>(Forwarders) : currentConfig.Forwarders,
+                RegisterDhcp = MyInvocation.BoundParameters.ContainsKey(nameof(RegisterDhcp)) ? (RegisterDhcp.IsPresent ? "1" : "0") : currentConfig.RegisterDhcp,
+                RegisterDhcpDomain = RegisterDhcpDomain ?? currentConfig.RegisterDhcpDomain,
+                RegisterDhcpStatic = MyInvocation.BoundParameters.ContainsKey(nameof(RegisterDhcpStatic)) ? (RegisterDhcpStatic.IsPresent ? "1" : "0") : currentConfig.RegisterDhcpStatic,
+                ActiveInterfaces = currentConfig.ActiveInterfaces
+            };
+
+            // Update the DNS configuration
+            var updateResult = ExecuteAsyncTask(() => dnsService.UpdateDNSConfigAsync(dnsConfig));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"DNS server configuration updated: {updateResult.Result}");
+
+            // Apply the changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => dnsService.ApplyDNSChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"DNS changes applied: {applyResult.Status}");
             }
         }
     }

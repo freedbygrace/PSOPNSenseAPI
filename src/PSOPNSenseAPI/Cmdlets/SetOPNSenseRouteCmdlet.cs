@@ -69,61 +69,71 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var routeService = new RouteService(ApiClient, Logger);
+
+            // Get current route
+            var getResult = ExecuteAsyncTask(() => routeService.GetRouteAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var routeService = new RouteService(ApiClient, Logger);
-
-                // Get current route
-                var getTask = Task.Run(async () => await routeService.GetRouteAsync(Uuid));
-                var currentRoute = getTask.GetAwaiter().GetResult().Route;
-
-                // Create updated route
-                var route = new RouteConfig
-                {
-                    Network = Network ?? currentRoute.Network,
-                    Gateway = Gateway ?? currentRoute.Gateway,
-                    Description = Description ?? currentRoute.Description
-                };
-
-                // Handle enabled/disabled state
-                if (Enabled.IsPresent && Disabled.IsPresent)
-                {
-                    WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
-                    route.Disabled = "0";
-                }
-                else if (Enabled.IsPresent)
-                {
-                    route.Disabled = "0";
-                }
-                else if (Disabled.IsPresent)
-                {
-                    route.Disabled = "1";
-                }
-                else
-                {
-                    route.Disabled = currentRoute.Disabled;
-                }
-
-                // Update route
-                var updateTask = Task.Run(async () => await routeService.UpdateRouteAsync(Uuid, route));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Route {Uuid} updated: {updateResult.Result}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await routeService.ApplyRouteChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"Route changes applied: {applyResult.Status}");
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var currentRoute = getResult.Route;
+
+            // Create updated route
+            var route = new RouteConfig
             {
-                HandleException(ex);
+                Network = Network ?? currentRoute.Network,
+                Gateway = Gateway ?? currentRoute.Gateway,
+                Description = Description ?? currentRoute.Description
+            };
+
+            // Handle enabled/disabled state
+            if (Enabled.IsPresent && Disabled.IsPresent)
+            {
+                WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
+                route.Disabled = "0";
+            }
+            else if (Enabled.IsPresent)
+            {
+                route.Disabled = "0";
+            }
+            else if (Disabled.IsPresent)
+            {
+                route.Disabled = "1";
+            }
+            else
+            {
+                route.Disabled = currentRoute.Disabled;
+            }
+
+            // Update route
+            var updateResult = ExecuteAsyncTask(() => routeService.UpdateRouteAsync(Uuid, route));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Route {Uuid} updated: {updateResult.Result}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => routeService.ApplyRouteChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"Route changes applied: {applyResult.Status}");
             }
         }
     }

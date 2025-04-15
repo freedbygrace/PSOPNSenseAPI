@@ -95,58 +95,63 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var firewallService = new FirewallService(ApiClient, Logger);
+
+            // First, get the current rule
+            var getResult = ExecuteAsyncTask(() => firewallService.GetRuleAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var firewallService = new FirewallService(ApiClient, Logger);
-
-                // First, get the current rule
-                var getTask = Task.Run(async () => await firewallService.GetRuleAsync(Uuid));
-                var currentRule = getTask.GetAwaiter().GetResult().Rule;
-
-                // Create the updated rule
-                var rule = new FirewallRuleCreate
-                {
-                    Description = Description ?? currentRule.Description,
-                    Protocol = Protocol ?? currentRule.Protocol,
-                    SourceNet = SourceNet ?? currentRule.SourceNet,
-                    SourcePort = SourcePort ?? currentRule.SourcePort,
-                    DestinationNet = DestinationNet ?? currentRule.DestinationNet,
-                    DestinationPort = DestinationPort ?? currentRule.DestinationPort,
-                    Action = Action ?? currentRule.Action,
-                    Sequence = Sequence ?? currentRule.Sequence
-                };
-
-                // Handle enabled/disabled state
-                if (Enabled.IsPresent && Disabled.IsPresent)
-                {
-                    WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
-                    rule.Enabled = "1";
-                }
-                else if (Enabled.IsPresent)
-                {
-                    rule.Enabled = "1";
-                }
-                else if (Disabled.IsPresent)
-                {
-                    rule.Enabled = "0";
-                }
-                else
-                {
-                    rule.Enabled = currentRule.Enabled;
-                }
-
-                // Update the rule
-                var updateTask = Task.Run(async () => await firewallService.UpdateRuleAsync(Uuid, rule));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Firewall rule {Uuid} updated: {updateResult.Result}");
+                return;
             }
-            catch (Exception ex)
+
+            var currentRule = getResult.Rule;
+
+            // Create the updated rule
+            var rule = new FirewallRuleCreate
             {
-                HandleException(ex);
+                Description = Description ?? currentRule.Description,
+                Protocol = Protocol ?? currentRule.Protocol,
+                SourceNet = SourceNet ?? currentRule.SourceNet,
+                SourcePort = SourcePort ?? currentRule.SourcePort,
+                DestinationNet = DestinationNet ?? currentRule.DestinationNet,
+                DestinationPort = DestinationPort ?? currentRule.DestinationPort,
+                Action = Action ?? currentRule.Action,
+                Sequence = Sequence ?? currentRule.Sequence
+            };
+
+            // Handle enabled/disabled state
+            if (Enabled.IsPresent && Disabled.IsPresent)
+            {
+                WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
+                rule.Enabled = "1";
             }
+            else if (Enabled.IsPresent)
+            {
+                rule.Enabled = "1";
+            }
+            else if (Disabled.IsPresent)
+            {
+                rule.Enabled = "0";
+            }
+            else
+            {
+                rule.Enabled = currentRule.Enabled;
+            }
+
+            // Update the rule
+            var updateResult = ExecuteAsyncTask(() => firewallService.UpdateRuleAsync(Uuid, rule));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Firewall rule {Uuid} updated: {updateResult.Result}");
         }
     }
 }

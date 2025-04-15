@@ -185,11 +185,7 @@ namespace PSOPNSenseAPI.Cmdlets
         {
             if (prefixLength <= network.Cidr)
             {
-                WriteError(new ErrorRecord(
-                    new ArgumentException($"Prefix length ({prefixLength}) must be greater than the network CIDR ({network.Cidr})."),
-                    "InvalidPrefixLength",
-                    ErrorCategory.InvalidArgument,
-                    null));
+                ProcessingException = new ArgumentException($"Prefix length ({prefixLength}) must be greater than the network CIDR ({network.Cidr}).");
                 return;
             }
 
@@ -206,11 +202,7 @@ namespace PSOPNSenseAPI.Cmdlets
             }
             catch (ArgumentException ex)
             {
-                WriteError(new ErrorRecord(
-                    ex,
-                    "InvalidSubnetCount",
-                    ErrorCategory.InvalidArgument,
-                    null));
+                ProcessingException = ex;
             }
         }
 
@@ -236,11 +228,7 @@ namespace PSOPNSenseAPI.Cmdlets
             }
             catch (Exception ex)
             {
-                WriteError(new ErrorRecord(
-                    ex,
-                    "InvalidIPAddress",
-                    ErrorCategory.InvalidArgument,
-                    null));
+                ProcessingException = ex;
             }
         }
 
@@ -267,11 +255,7 @@ namespace PSOPNSenseAPI.Cmdlets
             }
             catch (Exception ex)
             {
-                WriteError(new ErrorRecord(
-                    ex,
-                    "InvalidAdditionalNetwork",
-                    ErrorCategory.InvalidArgument,
-                    null));
+                ProcessingException = ex;
             }
         }
 
@@ -292,11 +276,7 @@ namespace PSOPNSenseAPI.Cmdlets
             }
             catch (Exception ex)
             {
-                WriteError(new ErrorRecord(
-                    ex,
-                    "SupernetError",
-                    ErrorCategory.InvalidOperation,
-                    null));
+                ProcessingException = ex;
             }
         }
 
@@ -317,11 +297,7 @@ namespace PSOPNSenseAPI.Cmdlets
             }
             catch (Exception ex)
             {
-                WriteError(new ErrorRecord(
-                    ex,
-                    "SupernetSummarizeError",
-                    ErrorCategory.InvalidOperation,
-                    null));
+                ProcessingException = ex;
             }
         }
     }

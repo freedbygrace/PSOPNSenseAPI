@@ -58,6 +58,14 @@ namespace PSOPNSenseAPI.Cmdlets
         public string IPWithSubnetMask { get; set; }
 
         /// <summary>
+        /// Begins the processing of the cmdlet
+        /// </summary>
+        protected override void BeginProcessing()
+        {
+            base.BeginProcessing();
+        }
+
+        /// <summary>
         /// Processes the cmdlet
         /// </summary>
         protected override void ProcessRecord()
@@ -88,22 +96,16 @@ namespace PSOPNSenseAPI.Cmdlets
                             string[] parts = IPWithCIDR.Split('/');
                             if (parts.Length != 2)
                             {
-                                WriteError(new ErrorRecord(
-                                    new ArgumentException($"Invalid IP with CIDR: {IPWithCIDR}. Expected format: 192.168.1.0/24"),
-                                    "InvalidIPWithCIDR",
-                                    ErrorCategory.InvalidArgument,
-                                    null));
+                                // Use WriteWarning instead of WriteError to avoid threading issues
+                                WriteWarning($"Invalid IP with CIDR: {IPWithCIDR}. Expected format: 192.168.1.0/24");
                                 return;
                             }
 
                             string ip = parts[0];
                             if (!int.TryParse(parts[1], out int cidr))
                             {
-                                WriteError(new ErrorRecord(
-                                    new ArgumentException($"Invalid CIDR: {parts[1]}"),
-                                    "InvalidCIDR",
-                                    ErrorCategory.InvalidArgument,
-                                    null));
+                                // Use WriteWarning instead of WriteError to avoid threading issues
+                                WriteWarning($"Invalid CIDR: {parts[1]}");
                                 return;
                             }
 
@@ -118,11 +120,8 @@ namespace PSOPNSenseAPI.Cmdlets
                             string[] parts = IPWithSubnetMask.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                             if (parts.Length != 2)
                             {
-                                WriteError(new ErrorRecord(
-                                    new ArgumentException($"Invalid IP with subnet mask: {IPWithSubnetMask}. Expected format: 192.168.1.0 255.255.255.0"),
-                                    "InvalidIPWithSubnetMask",
-                                    ErrorCategory.InvalidArgument,
-                                    null));
+                                // Use WriteWarning instead of WriteError to avoid threading issues
+                                WriteWarning($"Invalid IP with subnet mask: {IPWithSubnetMask}. Expected format: 192.168.1.0 255.255.255.0");
                                 return;
                             }
 
@@ -136,12 +135,17 @@ namespace PSOPNSenseAPI.Cmdlets
             }
             catch (Exception ex)
             {
-                WriteError(new ErrorRecord(
-                    ex,
-                    "ConversionError",
-                    ErrorCategory.InvalidOperation,
-                    null));
+                // Use WriteWarning instead of WriteError to avoid threading issues
+                WriteWarning($"Conversion error: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Ends the processing of the cmdlet
+        /// </summary>
+        protected override void EndProcessing()
+        {
+            base.EndProcessing();
         }
     }
 }

@@ -18,6 +18,14 @@ namespace PSOPNSenseAPI.Cmdlets
     public class DisconnectOPNSenseCmdlet : PSCmdlet
     {
         /// <summary>
+        /// Begins the processing of the cmdlet
+        /// </summary>
+        protected override void BeginProcessing()
+        {
+            base.BeginProcessing();
+        }
+
+        /// <summary>
         /// Processes the cmdlet
         /// </summary>
         protected override void ProcessRecord()
@@ -38,12 +46,17 @@ namespace PSOPNSenseAPI.Cmdlets
             }
             catch (Exception ex)
             {
-                WriteError(new ErrorRecord(
-                    ex,
-                    "DisconnectionFailed",
-                    ErrorCategory.ConnectionError,
-                    null));
+                // Use WriteWarning instead of WriteError to avoid threading issues
+                WriteWarning($"Failed to disconnect: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Ends the processing of the cmdlet
+        /// </summary>
+        protected override void EndProcessing()
+        {
+            base.EndProcessing();
         }
     }
 }

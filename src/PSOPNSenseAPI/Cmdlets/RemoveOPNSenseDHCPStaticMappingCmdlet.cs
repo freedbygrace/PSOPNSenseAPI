@@ -52,44 +52,54 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var dhcpService = new DHCPService(ApiClient, Logger);
+
+            // Get the mapping details for the confirmation message
+            var getResult = ExecuteAsyncTask(() => dhcpService.GetStaticMappingAsync(Interface, Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var dhcpService = new DHCPService(ApiClient, Logger);
+                return;
+            }
 
-                // Get the mapping details for the confirmation message
-                var getTask = Task.Run(async () => await dhcpService.GetStaticMappingAsync(Interface, Uuid));
-                var mapping = getTask.GetAwaiter().GetResult().Mapping;
+            var mapping = getResult.Mapping;
 
-                string confirmMessage = $"Static mapping: {mapping.MacAddress} -> {mapping.IpAddress}";
-                if (!string.IsNullOrEmpty(mapping.Hostname))
-                {
-                    confirmMessage += $" ({mapping.Hostname})";
-                }
+            string confirmMessage = $"Static mapping: {mapping.MacAddress} -> {mapping.IpAddress}";
+            if (!string.IsNullOrEmpty(mapping.Hostname))
+            {
+                confirmMessage += $" ({mapping.Hostname})";
+            }
 
-                if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            {
+                return;
+            }
+
+            var deleteResult = ExecuteAsyncTask(() => dhcpService.DeleteStaticMappingAsync(Interface, Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || deleteResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Static mapping {Uuid} removed: {deleteResult.Result}");
+
+            // Apply the changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => dhcpService.ApplyChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
                 {
                     return;
                 }
 
-                var deleteTask = Task.Run(async () => await dhcpService.DeleteStaticMappingAsync(Interface, Uuid));
-                var deleteResult = deleteTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Static mapping {Uuid} removed: {deleteResult.Result}");
-
-                // Apply the changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await dhcpService.ApplyChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-                    
-                    WriteVerbose($"DHCP changes applied: {applyResult.Status}");
-                }
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
+                WriteVerbose($"DHCP changes applied: {applyResult.Status}");
             }
         }
     }

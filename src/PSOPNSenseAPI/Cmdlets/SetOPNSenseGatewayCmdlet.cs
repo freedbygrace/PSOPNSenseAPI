@@ -131,122 +131,132 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var gatewayService = new GatewayService(ApiClient, Logger);
+
+            // Get current gateway
+            var getResult = ExecuteAsyncTask(() => gatewayService.GetGatewayAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var gatewayService = new GatewayService(ApiClient, Logger);
-
-                // Get current gateway
-                var getTask = Task.Run(async () => await gatewayService.GetGatewayAsync(Uuid));
-                var currentGateway = getTask.GetAwaiter().GetResult().Gateway;
-
-                // Create updated gateway
-                var gateway = new GatewayConfig
-                {
-                    Name = Name ?? currentGateway.Name,
-                    Interface = Interface ?? currentGateway.Interface,
-                    IpAddress = IpAddress ?? currentGateway.IpAddress,
-                    MonitorIp = MonitorIp ?? currentGateway.MonitorIp,
-                    Description = Description ?? currentGateway.Description,
-                    Weight = Weight?.ToString() ?? currentGateway.Weight,
-                    IpProtocol = IpProtocol ?? currentGateway.IpProtocol
-                };
-
-                // Handle default/not default
-                if (Default.IsPresent && NotDefault.IsPresent)
-                {
-                    WriteWarning("Both -Default and -NotDefault parameters were specified. Using -Default.");
-                    gateway.IsDefault = "1";
-                }
-                else if (Default.IsPresent)
-                {
-                    gateway.IsDefault = "1";
-                }
-                else if (NotDefault.IsPresent)
-                {
-                    gateway.IsDefault = "0";
-                }
-                else
-                {
-                    gateway.IsDefault = currentGateway.IsDefault;
-                }
-
-                // Handle enabled/disabled
-                if (Enabled.IsPresent && Disabled.IsPresent)
-                {
-                    WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
-                    gateway.Disabled = "0";
-                }
-                else if (Enabled.IsPresent)
-                {
-                    gateway.Disabled = "0";
-                }
-                else if (Disabled.IsPresent)
-                {
-                    gateway.Disabled = "1";
-                }
-                else
-                {
-                    gateway.Disabled = currentGateway.Disabled;
-                }
-
-                // Handle monitoring
-                if (EnableMonitoring.IsPresent && DisableMonitoring.IsPresent)
-                {
-                    WriteWarning("Both -EnableMonitoring and -DisableMonitoring parameters were specified. Using -EnableMonitoring.");
-                    gateway.MonitorDisable = "0";
-                }
-                else if (EnableMonitoring.IsPresent)
-                {
-                    gateway.MonitorDisable = "0";
-                }
-                else if (DisableMonitoring.IsPresent)
-                {
-                    gateway.MonitorDisable = "1";
-                }
-                else
-                {
-                    gateway.MonitorDisable = currentGateway.MonitorDisable;
-                }
-
-                // Handle force down
-                if (ForceDown.IsPresent && NoForceDown.IsPresent)
-                {
-                    WriteWarning("Both -ForceDown and -NoForceDown parameters were specified. Using -ForceDown.");
-                    gateway.ForceDown = "1";
-                }
-                else if (ForceDown.IsPresent)
-                {
-                    gateway.ForceDown = "1";
-                }
-                else if (NoForceDown.IsPresent)
-                {
-                    gateway.ForceDown = "0";
-                }
-                else
-                {
-                    gateway.ForceDown = currentGateway.ForceDown;
-                }
-
-                // Update gateway
-                var updateTask = Task.Run(async () => await gatewayService.UpdateGatewayAsync(Uuid, gateway));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Gateway {Uuid} updated: {updateResult.Result}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await gatewayService.ApplyGatewayChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"Gateway changes applied: {applyResult.Status}");
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var currentGateway = getResult.Gateway;
+
+            // Create updated gateway
+            var gateway = new GatewayConfig
             {
-                HandleException(ex);
+                Name = Name ?? currentGateway.Name,
+                Interface = Interface ?? currentGateway.Interface,
+                IpAddress = IpAddress ?? currentGateway.IpAddress,
+                MonitorIp = MonitorIp ?? currentGateway.MonitorIp,
+                Description = Description ?? currentGateway.Description,
+                Weight = Weight?.ToString() ?? currentGateway.Weight,
+                IpProtocol = IpProtocol ?? currentGateway.IpProtocol
+            };
+
+            // Handle default/not default
+            if (Default.IsPresent && NotDefault.IsPresent)
+            {
+                WriteWarning("Both -Default and -NotDefault parameters were specified. Using -Default.");
+                gateway.IsDefault = "1";
+            }
+            else if (Default.IsPresent)
+            {
+                gateway.IsDefault = "1";
+            }
+            else if (NotDefault.IsPresent)
+            {
+                gateway.IsDefault = "0";
+            }
+            else
+            {
+                gateway.IsDefault = currentGateway.IsDefault;
+            }
+
+            // Handle enabled/disabled
+            if (Enabled.IsPresent && Disabled.IsPresent)
+            {
+                WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
+                gateway.Disabled = "0";
+            }
+            else if (Enabled.IsPresent)
+            {
+                gateway.Disabled = "0";
+            }
+            else if (Disabled.IsPresent)
+            {
+                gateway.Disabled = "1";
+            }
+            else
+            {
+                gateway.Disabled = currentGateway.Disabled;
+            }
+
+            // Handle monitoring
+            if (EnableMonitoring.IsPresent && DisableMonitoring.IsPresent)
+            {
+                WriteWarning("Both -EnableMonitoring and -DisableMonitoring parameters were specified. Using -EnableMonitoring.");
+                gateway.MonitorDisable = "0";
+            }
+            else if (EnableMonitoring.IsPresent)
+            {
+                gateway.MonitorDisable = "0";
+            }
+            else if (DisableMonitoring.IsPresent)
+            {
+                gateway.MonitorDisable = "1";
+            }
+            else
+            {
+                gateway.MonitorDisable = currentGateway.MonitorDisable;
+            }
+
+            // Handle force down
+            if (ForceDown.IsPresent && NoForceDown.IsPresent)
+            {
+                WriteWarning("Both -ForceDown and -NoForceDown parameters were specified. Using -ForceDown.");
+                gateway.ForceDown = "1";
+            }
+            else if (ForceDown.IsPresent)
+            {
+                gateway.ForceDown = "1";
+            }
+            else if (NoForceDown.IsPresent)
+            {
+                gateway.ForceDown = "0";
+            }
+            else
+            {
+                gateway.ForceDown = currentGateway.ForceDown;
+            }
+
+            // Update gateway
+            var updateResult = ExecuteAsyncTask(() => gatewayService.UpdateGatewayAsync(Uuid, gateway));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Gateway {Uuid} updated: {updateResult.Result}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => gatewayService.ApplyGatewayChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"Gateway changes applied: {applyResult.Status}");
             }
         }
     }

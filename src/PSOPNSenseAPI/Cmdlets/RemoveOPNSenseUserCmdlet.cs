@@ -39,36 +39,41 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var userService = new UserService(ApiClient, Logger);
+
+            // Get the user details for the confirmation message
+            var getResult = ExecuteAsyncTask(() => userService.GetUserAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var userService = new UserService(ApiClient, Logger);
-
-                // Get the user details for the confirmation message
-                var getTask = Task.Run(async () => await userService.GetUserAsync(Uuid));
-                var user = getTask.GetAwaiter().GetResult().User;
-
-                string confirmMessage = $"User: {user.Username}";
-                if (!string.IsNullOrEmpty(user.FullName))
-                {
-                    confirmMessage += $" ({user.FullName})";
-                }
-
-                if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
-                {
-                    return;
-                }
-
-                var deleteTask = Task.Run(async () => await userService.DeleteUserAsync(Uuid));
-                var deleteResult = deleteTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"User {Uuid} removed: {deleteResult.Result}");
+                return;
             }
-            catch (Exception ex)
+
+            var user = getResult.User;
+
+            string confirmMessage = $"User: {user.Username}";
+            if (!string.IsNullOrEmpty(user.FullName))
             {
-                HandleException(ex);
+                confirmMessage += $" ({user.FullName})";
             }
+
+            if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            {
+                return;
+            }
+
+            var deleteResult = ExecuteAsyncTask(() => userService.DeleteUserAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || deleteResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"User {Uuid} removed: {deleteResult.Result}");
         }
     }
 }

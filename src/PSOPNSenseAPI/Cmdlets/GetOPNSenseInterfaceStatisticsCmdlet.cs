@@ -26,33 +26,32 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var interfaceService = new InterfaceService(ApiClient, Logger);
+
+            // Use our safe execution method
+            var result = ExecuteAsyncTask(() => interfaceService.GetInterfaceStatisticsAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || result == null)
             {
-                var interfaceService = new InterfaceService(ApiClient, Logger);
-
-                var task = Task.Run(async () => await interfaceService.GetInterfaceStatisticsAsync());
-                var result = task.GetAwaiter().GetResult();
-
-                foreach (var kvp in result.Statistics)
-                {
-                    var stats = new PSObject();
-                    stats.Properties.Add(new PSNoteProperty("Name", kvp.Key));
-                    stats.Properties.Add(new PSNoteProperty("InPackets", kvp.Value.InPackets));
-                    stats.Properties.Add(new PSNoteProperty("InBytes", kvp.Value.InBytes));
-                    stats.Properties.Add(new PSNoteProperty("InErrors", 0));
-                    stats.Properties.Add(new PSNoteProperty("OutPackets", kvp.Value.OutPackets));
-                    stats.Properties.Add(new PSNoteProperty("OutBytes", kvp.Value.OutBytes));
-                    stats.Properties.Add(new PSNoteProperty("OutErrors", 0));
-                    stats.Properties.Add(new PSNoteProperty("Collisions", 0));
-
-                    WriteObject(stats);
-                }
+                return;
             }
-            catch (Exception ex)
+
+            foreach (var kvp in result.Statistics)
             {
-                HandleException(ex);
+                var stats = new PSObject();
+                stats.Properties.Add(new PSNoteProperty("Name", kvp.Key));
+                stats.Properties.Add(new PSNoteProperty("InPackets", kvp.Value.InPackets));
+                stats.Properties.Add(new PSNoteProperty("InBytes", kvp.Value.InBytes));
+                stats.Properties.Add(new PSNoteProperty("InErrors", 0));
+                stats.Properties.Add(new PSNoteProperty("OutPackets", kvp.Value.OutPackets));
+                stats.Properties.Add(new PSNoteProperty("OutBytes", kvp.Value.OutBytes));
+                stats.Properties.Add(new PSNoteProperty("OutErrors", 0));
+                stats.Properties.Add(new PSNoteProperty("Collisions", 0));
+
+                WriteObject(stats);
             }
         }
     }

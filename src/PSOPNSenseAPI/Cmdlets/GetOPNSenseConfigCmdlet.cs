@@ -28,17 +28,23 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
+            var configService = new ConfigService(ApiClient, Logger);
+
+            // Use our safe execution method
+            var configContent = ExecuteAsyncTask(() => configService.ExportConfigAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || configContent == null)
+            {
+                return;
+            }
+
+            // Convert the byte array to an XML document
+            var xmlDoc = new XmlDocument();
             try
             {
-                var configService = new ConfigService(ApiClient, Logger);
-
-                // Execute the async method synchronously on the main thread
-                var configContent = configService.ExportConfigAsync().GetAwaiter().GetResult();
-
-                // Convert the byte array to an XML document
-                var xmlDoc = new XmlDocument();
                 using (var memoryStream = new MemoryStream(configContent))
                 {
                     xmlDoc.Load(memoryStream);
@@ -49,7 +55,8 @@ namespace PSOPNSenseAPI.Cmdlets
             }
             catch (Exception ex)
             {
-                HandleException(ex);
+                ProcessingException = ex;
+                WriteWarning($"Failed to parse XML configuration: {ex.Message}");
             }
         }
     }

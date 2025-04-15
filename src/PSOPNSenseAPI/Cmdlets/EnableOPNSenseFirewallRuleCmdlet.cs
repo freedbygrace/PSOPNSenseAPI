@@ -28,21 +28,20 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
-            {
-                var firewallService = new FirewallService(ApiClient, Logger);
+            var firewallService = new FirewallService(ApiClient, Logger);
 
-                var task = Task.Run(async () => await firewallService.ToggleRuleAsync(Uuid, true));
-                var result = task.GetAwaiter().GetResult();
+            // Use our safe execution method
+            var result = ExecuteAsyncTask(() => firewallService.ToggleRuleAsync(Uuid, true));
 
-                WriteVerbose($"Firewall rule {Uuid} enabled: {result.Result}");
-            }
-            catch (Exception ex)
+            // Only continue if no exception occurred
+            if (ProcessingException != null || result == null)
             {
-                HandleException(ex);
+                return;
             }
+
+            WriteVerbose($"Firewall rule {Uuid} enabled: {result.Result}");
         }
     }
 }

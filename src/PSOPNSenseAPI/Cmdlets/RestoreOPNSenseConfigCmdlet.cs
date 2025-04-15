@@ -53,26 +53,33 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
-            {
-                var configService = new ConfigService(ApiClient, Logger);
-                string actionDescription = "Restore configuration";
-                string targetName = ParameterSetName == "Filename" ? Filename : "from XML document";
+            var configService = new ConfigService(ApiClient, Logger);
+            string actionDescription = "Restore configuration";
+            string targetName = ParameterSetName == "Filename" ? Filename : "from XML document";
 
-                if (!Force.IsPresent && !ShouldProcess(targetName, actionDescription))
+            if (!Force.IsPresent && !ShouldProcess(targetName, actionDescription))
+            {
+                return;
+            }
+
+            if (ParameterSetName == "Filename")
+            {
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => configService.RestoreConfigBackupAsync(Filename));
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
                 {
                     return;
                 }
 
-                if (ParameterSetName == "Filename")
-                {
-                    // Restore from backup file - execute synchronously on the main thread
-                    var result = configService.RestoreConfigBackupAsync(Filename).GetAwaiter().GetResult();
-                    WriteVerbose($"Restored configuration from backup: {result.Status}");
-                }
-                else
+                WriteVerbose($"Restored configuration from backup: {result.Status}");
+            }
+            else
+            {
+                try
                 {
                     // Restore from XML document
                     byte[] configContent;
@@ -82,17 +89,26 @@ namespace PSOPNSenseAPI.Cmdlets
                         configContent = memoryStream.ToArray();
                     }
 
-                    // Execute synchronously on the main thread
-                    var result = configService.ImportConfigAsync(configContent).GetAwaiter().GetResult();
+                    // Use our safe execution method
+                    var result = ExecuteAsyncTask(() => configService.ImportConfigAsync(configContent));
+
+                    // Only continue if no exception occurred
+                    if (ProcessingException != null || result == null)
+                    {
+                        return;
+                    }
+
                     WriteVerbose($"Restored configuration from XML document: {result.Status}");
                 }
+                catch (Exception ex)
+                {
+                    ProcessingException = ex;
+                    WriteWarning($"Failed to process XML document: {ex.Message}");
+                    return;
+                }
+            }
 
-                WriteWarning("The firewall is restarting. You may need to reconnect after it comes back online.");
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
-            }
+            WriteWarning("The firewall is restarting. You may need to reconnect after it comes back online.");
         }
     }
 }

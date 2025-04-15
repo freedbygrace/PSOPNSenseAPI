@@ -130,14 +130,23 @@ namespace PSOPNSenseAPI.Cmdlets
                         // Try to get the system status
                         var statusService = new SystemService(newClient, logger);
 
-                        // We need to use Task.Run here because we're creating a new client
+                        // We need to handle this specially because we're using a new client
                         // and can't use ExecuteAsyncTask which uses the existing client
-                        var statusTask = Task.Run(async () => await statusService.GetStatusAsync());
-                        var statusResult = statusTask.GetAwaiter().GetResult();
+                        try
+                        {
+                            // Use ConfigureAwait(false) to avoid deadlocks
+                            var statusResult = statusService.GetStatusAsync().ConfigureAwait(false).GetAwaiter().GetResult();
 
-                        // If we get here, the firewall is back online
-                        WriteVerbose("Successfully reconnected to the firewall");
-                        WriteObject($"Firewall is back online. Uptime: {statusResult.Uptime}");
+                            // If we get here, the firewall is back online
+                            WriteVerbose("Successfully reconnected to the firewall");
+                            WriteObject($"Firewall is back online. Uptime: {statusResult.Uptime}");
+                        }
+                        catch (Exception innerEx)
+                        {
+                            // Just log and continue the retry loop
+                            WriteVerbose($"Status check failed: {innerEx.Message}");
+                            throw; // Re-throw to be caught by the outer catch
+                        }
 
                         // Set the new session
                         OPNSenseSession.Current = newClient;

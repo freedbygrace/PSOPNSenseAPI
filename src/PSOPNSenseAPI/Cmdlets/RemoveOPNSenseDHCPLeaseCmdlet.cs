@@ -45,44 +45,54 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var dhcpService = new DHCPService(ApiClient, Logger);
+
+            // Get the lease details for the confirmation message
+            var getResult = ExecuteAsyncTask(() => dhcpService.GetLeaseByMacAsync(MacAddress));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var dhcpService = new DHCPService(ApiClient, Logger);
+                return;
+            }
 
-                // Get the lease details for the confirmation message
-                var getTask = Task.Run(async () => await dhcpService.GetLeaseByMacAsync(MacAddress));
-                var lease = getTask.GetAwaiter().GetResult().Lease;
+            var lease = getResult.Lease;
 
-                string confirmMessage = $"DHCP lease: {lease.MacAddress} -> {lease.IpAddress}";
-                if (!string.IsNullOrEmpty(lease.Hostname))
-                {
-                    confirmMessage += $" ({lease.Hostname})";
-                }
+            string confirmMessage = $"DHCP lease: {lease.MacAddress} -> {lease.IpAddress}";
+            if (!string.IsNullOrEmpty(lease.Hostname))
+            {
+                confirmMessage += $" ({lease.Hostname})";
+            }
 
-                if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            {
+                return;
+            }
+
+            var deleteResult = ExecuteAsyncTask(() => dhcpService.DeleteLeaseAsync(MacAddress));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || deleteResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"DHCP lease {MacAddress} removed: {deleteResult.Result}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => dhcpService.ApplyChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
                 {
                     return;
                 }
 
-                var deleteTask = Task.Run(async () => await dhcpService.DeleteLeaseAsync(MacAddress));
-                var deleteResult = deleteTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"DHCP lease {MacAddress} removed: {deleteResult.Result}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await dhcpService.ApplyChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"DHCP changes applied: {applyResult.Status}");
-                }
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
+                WriteVerbose($"DHCP changes applied: {applyResult.Status}");
             }
         }
     }

@@ -39,36 +39,41 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var firewallService = new FirewallService(ApiClient, Logger);
+
+            // Get the rule details for the confirmation message
+            var getResult = ExecuteAsyncTask(() => firewallService.GetRuleAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var firewallService = new FirewallService(ApiClient, Logger);
-
-                // Get the rule details for the confirmation message
-                var getTask = Task.Run(async () => await firewallService.GetRuleAsync(Uuid));
-                var rule = getTask.GetAwaiter().GetResult().Rule;
-
-                string confirmMessage = $"Firewall rule: {rule.Description}";
-                if (!string.IsNullOrEmpty(rule.Protocol) && rule.Protocol != "any")
-                {
-                    confirmMessage += $" ({rule.Protocol})";
-                }
-
-                if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
-                {
-                    return;
-                }
-
-                var deleteTask = Task.Run(async () => await firewallService.DeleteRuleAsync(Uuid));
-                var deleteResult = deleteTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Firewall rule {Uuid} removed: {deleteResult.Result}");
+                return;
             }
-            catch (Exception ex)
+
+            var rule = getResult.Rule;
+
+            string confirmMessage = $"Firewall rule: {rule.Description}";
+            if (!string.IsNullOrEmpty(rule.Protocol) && rule.Protocol != "any")
             {
-                HandleException(ex);
+                confirmMessage += $" ({rule.Protocol})";
             }
+
+            if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            {
+                return;
+            }
+
+            var deleteResult = ExecuteAsyncTask(() => firewallService.DeleteRuleAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || deleteResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Firewall rule {Uuid} removed: {deleteResult.Result}");
         }
     }
 }

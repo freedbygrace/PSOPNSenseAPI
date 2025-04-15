@@ -45,44 +45,54 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var gatewayService = new GatewayService(ApiClient, Logger);
+
+            // Get the gateway details for the confirmation message
+            var getResult = ExecuteAsyncTask(() => gatewayService.GetGatewayAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var gatewayService = new GatewayService(ApiClient, Logger);
+                return;
+            }
 
-                // Get the gateway details for the confirmation message
-                var getTask = Task.Run(async () => await gatewayService.GetGatewayAsync(Uuid));
-                var gateway = getTask.GetAwaiter().GetResult().Gateway;
+            var gateway = getResult.Gateway;
 
-                string confirmMessage = $"Gateway: {gateway.Name} ({gateway.IpAddress})";
-                if (!string.IsNullOrEmpty(gateway.Description))
-                {
-                    confirmMessage += $" - {gateway.Description}";
-                }
+            string confirmMessage = $"Gateway: {gateway.Name} ({gateway.IpAddress})";
+            if (!string.IsNullOrEmpty(gateway.Description))
+            {
+                confirmMessage += $" - {gateway.Description}";
+            }
 
-                if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            {
+                return;
+            }
+
+            var deleteResult = ExecuteAsyncTask(() => gatewayService.DeleteGatewayAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || deleteResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Gateway {Uuid} removed: {deleteResult.Result}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => gatewayService.ApplyGatewayChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
                 {
                     return;
                 }
 
-                var deleteTask = Task.Run(async () => await gatewayService.DeleteGatewayAsync(Uuid));
-                var deleteResult = deleteTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Gateway {Uuid} removed: {deleteResult.Result}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await gatewayService.ApplyGatewayChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"Gateway changes applied: {applyResult.Status}");
-                }
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
+                WriteVerbose($"Gateway changes applied: {applyResult.Status}");
             }
         }
     }

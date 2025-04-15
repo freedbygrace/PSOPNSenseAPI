@@ -93,92 +93,102 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var systemDNSService = new SystemDNSService(ApiClient, Logger);
+
+            // Get current configuration
+            var getResult = ExecuteAsyncTask(() => systemDNSService.GetSystemDNSAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var systemDNSService = new SystemDNSService(ApiClient, Logger);
-
-                // Get current configuration
-                var getTask = Task.Run(async () => await systemDNSService.GetSystemDNSAsync());
-                var currentConfig = getTask.GetAwaiter().GetResult().System;
-
-                // Create updated configuration
-                var config = new SystemDNSConfig
-                {
-                    Hostname = Hostname ?? currentConfig.Hostname,
-                    Domain = Domain ?? currentConfig.Domain,
-                    Timezone = Timezone ?? currentConfig.Timezone,
-                    TimeServers = TimeServers ?? currentConfig.TimeServers,
-                    Language = Language ?? currentConfig.Language
-                };
-
-                // Handle DNS servers
-                if (DnsServers != null && DnsServers.Length > 0)
-                {
-                    config.DnsServers = new List<string>(DnsServers);
-                }
-                else
-                {
-                    config.DnsServers = currentConfig.DnsServers;
-                }
-
-                // Handle DNS override
-                if (AllowDnsOverride.IsPresent && DisallowDnsOverride.IsPresent)
-                {
-                    WriteWarning("Both -AllowDnsOverride and -DisallowDnsOverride parameters were specified. Using -AllowDnsOverride.");
-                    config.DnsAllowOverride = "1";
-                }
-                else if (AllowDnsOverride.IsPresent)
-                {
-                    config.DnsAllowOverride = "1";
-                }
-                else if (DisallowDnsOverride.IsPresent)
-                {
-                    config.DnsAllowOverride = "0";
-                }
-                else
-                {
-                    config.DnsAllowOverride = currentConfig.DnsAllowOverride;
-                }
-
-                // Handle DNS rebind protection
-                if (DisableDnsRebindProtection.IsPresent && EnableDnsRebindProtection.IsPresent)
-                {
-                    WriteWarning("Both -DisableDnsRebindProtection and -EnableDnsRebindProtection parameters were specified. Using -DisableDnsRebindProtection.");
-                    config.DnssecStripped = "1";
-                }
-                else if (DisableDnsRebindProtection.IsPresent)
-                {
-                    config.DnssecStripped = "1";
-                }
-                else if (EnableDnsRebindProtection.IsPresent)
-                {
-                    config.DnssecStripped = "0";
-                }
-                else
-                {
-                    config.DnssecStripped = currentConfig.DnssecStripped;
-                }
-
-                // Update configuration
-                var updateTask = Task.Run(async () => await systemDNSService.UpdateSystemDNSAsync(config));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"System DNS configuration updated: {updateResult.Result}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await systemDNSService.ApplySystemDNSChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"System DNS changes applied: {applyResult.Status}");
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var currentConfig = getResult.System;
+
+            // Create updated configuration
+            var config = new SystemDNSConfig
             {
-                HandleException(ex);
+                Hostname = Hostname ?? currentConfig.Hostname,
+                Domain = Domain ?? currentConfig.Domain,
+                Timezone = Timezone ?? currentConfig.Timezone,
+                TimeServers = TimeServers ?? currentConfig.TimeServers,
+                Language = Language ?? currentConfig.Language
+            };
+
+            // Handle DNS servers
+            if (DnsServers != null && DnsServers.Length > 0)
+            {
+                config.DnsServers = new List<string>(DnsServers);
+            }
+            else
+            {
+                config.DnsServers = currentConfig.DnsServers;
+            }
+
+            // Handle DNS override
+            if (AllowDnsOverride.IsPresent && DisallowDnsOverride.IsPresent)
+            {
+                WriteWarning("Both -AllowDnsOverride and -DisallowDnsOverride parameters were specified. Using -AllowDnsOverride.");
+                config.DnsAllowOverride = "1";
+            }
+            else if (AllowDnsOverride.IsPresent)
+            {
+                config.DnsAllowOverride = "1";
+            }
+            else if (DisallowDnsOverride.IsPresent)
+            {
+                config.DnsAllowOverride = "0";
+            }
+            else
+            {
+                config.DnsAllowOverride = currentConfig.DnsAllowOverride;
+            }
+
+            // Handle DNS rebind protection
+            if (DisableDnsRebindProtection.IsPresent && EnableDnsRebindProtection.IsPresent)
+            {
+                WriteWarning("Both -DisableDnsRebindProtection and -EnableDnsRebindProtection parameters were specified. Using -DisableDnsRebindProtection.");
+                config.DnssecStripped = "1";
+            }
+            else if (DisableDnsRebindProtection.IsPresent)
+            {
+                config.DnssecStripped = "1";
+            }
+            else if (EnableDnsRebindProtection.IsPresent)
+            {
+                config.DnssecStripped = "0";
+            }
+            else
+            {
+                config.DnssecStripped = currentConfig.DnssecStripped;
+            }
+
+            // Update configuration
+            var updateResult = ExecuteAsyncTask(() => systemDNSService.UpdateSystemDNSAsync(config));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"System DNS configuration updated: {updateResult.Result}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => systemDNSService.ApplySystemDNSChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"System DNS changes applied: {applyResult.Status}");
             }
         }
     }

@@ -28,22 +28,21 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
-            {
-                var pluginService = new PluginService(ApiClient, Logger);
+            var pluginService = new PluginService(ApiClient, Logger);
 
-                var task = Task.Run(async () => await pluginService.DisablePluginAsync(Name));
-                var result = task.GetAwaiter().GetResult();
+            // Use our safe execution method
+            var result = ExecuteAsyncTask(() => pluginService.DisablePluginAsync(Name));
 
-                WriteVerbose($"Plugin {Name} disabled: {result.Status}");
-                WriteObject($"Plugin {Name} disabled: {result.Status}");
-            }
-            catch (Exception ex)
+            // Only continue if no exception occurred
+            if (ProcessingException != null || result == null)
             {
-                HandleException(ex);
+                return;
             }
+
+            WriteVerbose($"Plugin {Name} disabled: {result.Status}");
+            WriteObject($"Plugin {Name} disabled: {result.Status}");
         }
     }
 }

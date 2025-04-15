@@ -66,43 +66,53 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var dhcpService = new DHCPService(ApiClient, Logger);
+
+            // Get current option
+            var getResult = ExecuteAsyncTask(() => dhcpService.GetOptionAsync(Interface, Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var dhcpService = new DHCPService(ApiClient, Logger);
-
-                // Get current option
-                var getTask = Task.Run(async () => await dhcpService.GetOptionAsync(Interface, Uuid));
-                var currentOption = getTask.GetAwaiter().GetResult().Option;
-
-                // Create updated option
-                var option = new DHCPOptionConfig
-                {
-                    Number = Number ?? currentOption.Number,
-                    Value = Value ?? currentOption.Value,
-                    Type = Type ?? currentOption.Type,
-                    Description = Description ?? currentOption.Description
-                };
-
-                // Update option
-                var updateTask = Task.Run(async () => await dhcpService.UpdateOptionAsync(Interface, Uuid, option));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"DHCP option {Uuid} updated: {updateResult.Result}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await dhcpService.ApplyChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"DHCP changes applied: {applyResult.Status}");
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var currentOption = getResult.Option;
+
+            // Create updated option
+            var option = new DHCPOptionConfig
             {
-                HandleException(ex);
+                Number = Number ?? currentOption.Number,
+                Value = Value ?? currentOption.Value,
+                Type = Type ?? currentOption.Type,
+                Description = Description ?? currentOption.Description
+            };
+
+            // Update option
+            var updateResult = ExecuteAsyncTask(() => dhcpService.UpdateOptionAsync(Interface, Uuid, option));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"DHCP option {Uuid} updated: {updateResult.Result}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => dhcpService.ApplyChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"DHCP changes applied: {applyResult.Status}");
             }
         }
     }

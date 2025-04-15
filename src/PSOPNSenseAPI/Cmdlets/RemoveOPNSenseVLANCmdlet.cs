@@ -39,36 +39,41 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var interfaceService = new InterfaceService(ApiClient, Logger);
+
+            // Get the VLAN details for the confirmation message
+            var getResult = ExecuteAsyncTask(() => interfaceService.GetVLANAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var interfaceService = new InterfaceService(ApiClient, Logger);
-
-                // Get the VLAN details for the confirmation message
-                var getTask = Task.Run(async () => await interfaceService.GetVLANAsync(Uuid));
-                var vlan = getTask.GetAwaiter().GetResult().Vlan;
-
-                string confirmMessage = $"VLAN {vlan.Tag} on interface {vlan.Interface}";
-                if (!string.IsNullOrEmpty(vlan.Description))
-                {
-                    confirmMessage += $" ({vlan.Description})";
-                }
-
-                if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
-                {
-                    return;
-                }
-
-                var deleteTask = Task.Run(async () => await interfaceService.DeleteVLANAsync(Uuid));
-                var deleteResult = deleteTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"VLAN {Uuid} removed: {deleteResult.Result}");
+                return;
             }
-            catch (Exception ex)
+
+            var vlan = getResult.Vlan;
+
+            string confirmMessage = $"VLAN {vlan.Tag} on interface {vlan.Interface}";
+            if (!string.IsNullOrEmpty(vlan.Description))
             {
-                HandleException(ex);
+                confirmMessage += $" ({vlan.Description})";
             }
+
+            if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            {
+                return;
+            }
+
+            var deleteResult = ExecuteAsyncTask(() => interfaceService.DeleteVLANAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || deleteResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"VLAN {Uuid} removed: {deleteResult.Result}");
         }
     }
 }

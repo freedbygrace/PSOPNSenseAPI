@@ -83,35 +83,34 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var firewallService = new FirewallService(ApiClient, Logger);
+
+            var rule = new FirewallRuleCreate
             {
-                var firewallService = new FirewallService(ApiClient, Logger);
+                Description = Description,
+                Protocol = Protocol,
+                SourceNet = SourceNet,
+                SourcePort = SourcePort,
+                DestinationNet = DestinationNet,
+                DestinationPort = DestinationPort,
+                Action = Action,
+                Sequence = Sequence,
+                Enabled = Enabled.IsPresent ? "1" : "0"
+            };
 
-                var rule = new FirewallRuleCreate
-                {
-                    Description = Description,
-                    Protocol = Protocol,
-                    SourceNet = SourceNet,
-                    SourcePort = SourcePort,
-                    DestinationNet = DestinationNet,
-                    DestinationPort = DestinationPort,
-                    Action = Action,
-                    Sequence = Sequence,
-                    Enabled = Enabled.IsPresent ? "1" : "0"
-                };
+            // Use our safe execution method
+            var result = ExecuteAsyncTask(() => firewallService.CreateRuleAsync(rule));
 
-                var task = Task.Run(async () => await firewallService.CreateRuleAsync(rule));
-                var result = task.GetAwaiter().GetResult();
-
-                WriteVerbose($"Created firewall rule with UUID {result.Uuid}");
-                WriteObject(result.Uuid);
-            }
-            catch (Exception ex)
+            // Only continue if no exception occurred
+            if (ProcessingException != null || result == null)
             {
-                HandleException(ex);
+                return;
             }
+
+            WriteVerbose($"Created firewall rule with UUID {result.Uuid}");
+            WriteObject(result.Uuid);
         }
     }
 }

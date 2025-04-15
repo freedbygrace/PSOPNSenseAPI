@@ -33,43 +33,49 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var dhcpService = new DHCPService(ApiClient, Logger);
+
+            if (ParameterSetName == "ByInterface")
             {
-                var dhcpService = new DHCPService(ApiClient, Logger);
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => dhcpService.GetServerAsync(Interface));
 
-                if (ParameterSetName == "ByInterface")
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
                 {
-                    var task = Task.Run(async () => await dhcpService.GetServerAsync(Interface));
-                    var result = task.GetAwaiter().GetResult();
-                    WriteObject(result.Server);
+                    return;
                 }
-                else
-                {
-                    var task = Task.Run(async () => await dhcpService.GetServersAsync());
-                    var result = task.GetAwaiter().GetResult();
 
-                    foreach (var kvp in result.Servers.Interfaces)
-                    {
-                        var server = new PSObject();
-                        server.Properties.Add(new PSNoteProperty("Interface", kvp.Key));
-                        server.Properties.Add(new PSNoteProperty("Enabled", kvp.Value.Enabled == "1"));
-                        server.Properties.Add(new PSNoteProperty("RangeFrom", kvp.Value.RangeFrom));
-                        server.Properties.Add(new PSNoteProperty("RangeTo", kvp.Value.RangeTo));
-                        server.Properties.Add(new PSNoteProperty("DefaultLeaseTime", kvp.Value.DefaultLeaseTime));
-                        server.Properties.Add(new PSNoteProperty("MaxLeaseTime", kvp.Value.MaxLeaseTime));
-                        server.Properties.Add(new PSNoteProperty("Domain", kvp.Value.Domain));
-                        server.Properties.Add(new PSNoteProperty("DnsServers", kvp.Value.DnsServers));
-                        server.Properties.Add(new PSNoteProperty("Gateway", kvp.Value.Gateway));
-                        
-                        WriteObject(server);
-                    }
-                }
+                WriteObject(result.Server);
             }
-            catch (Exception ex)
+            else
             {
-                HandleException(ex);
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => dhcpService.GetServersAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
+                {
+                    return;
+                }
+
+                foreach (var kvp in result.Servers.Interfaces)
+                {
+                    var server = new PSObject();
+                    server.Properties.Add(new PSNoteProperty("Interface", kvp.Key));
+                    server.Properties.Add(new PSNoteProperty("Enabled", kvp.Value.Enabled == "1"));
+                    server.Properties.Add(new PSNoteProperty("RangeFrom", kvp.Value.RangeFrom));
+                    server.Properties.Add(new PSNoteProperty("RangeTo", kvp.Value.RangeTo));
+                    server.Properties.Add(new PSNoteProperty("DefaultLeaseTime", kvp.Value.DefaultLeaseTime));
+                    server.Properties.Add(new PSNoteProperty("MaxLeaseTime", kvp.Value.MaxLeaseTime));
+                    server.Properties.Add(new PSNoteProperty("Domain", kvp.Value.Domain));
+                    server.Properties.Add(new PSNoteProperty("DnsServers", kvp.Value.DnsServers));
+                    server.Properties.Add(new PSNoteProperty("Gateway", kvp.Value.Gateway));
+
+                    WriteObject(server);
+                }
             }
         }
     }

@@ -46,54 +46,69 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
-            {
-                var firewallService = new FirewallService(ApiClient, Logger);
+            var firewallService = new FirewallService(ApiClient, Logger);
 
-                if (NoRollback.IsPresent)
+            if (NoRollback.IsPresent)
+            {
+                WriteVerbose("Applying firewall changes without rollback protection");
+                var applyResult = ExecuteAsyncTask(() => firewallService.ApplyChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
                 {
-                    WriteVerbose("Applying firewall changes without rollback protection");
-                    var applyTask = Task.Run(async () => await firewallService.ApplyChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-                    WriteVerbose($"Firewall changes applied: {applyResult.Status}");
+                    return;
+                }
+
+                WriteVerbose($"Firewall changes applied: {applyResult.Status}");
+            }
+            else
+            {
+                WriteVerbose("Creating savepoint for rollback protection");
+                var savepointResult = ExecuteAsyncTask(() => firewallService.CreateSavepointAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || savepointResult == null)
+                {
+                    return;
+                }
+
+                var revision = savepointResult.Revision;
+
+                WriteVerbose($"Created savepoint with revision {revision}");
+                WriteVerbose("Applying firewall changes with rollback protection");
+
+                var applyResult = ExecuteAsyncTask(() => firewallService.ApplyChangesAsync(revision));
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"Firewall changes applied: {applyResult.Status}");
+
+                if (CancelRollback.IsPresent)
+                {
+                    WriteVerbose($"Waiting {Timeout} seconds before cancelling rollback");
+                    System.Threading.Thread.Sleep(Timeout * 1000);
+
+                    WriteVerbose("Cancelling automatic rollback");
+                    var cancelResult = ExecuteAsyncTask(() => firewallService.CancelRollbackAsync(revision));
+
+                    // Only continue if no exception occurred
+                    if (ProcessingException != null || cancelResult == null)
+                    {
+                        return;
+                    }
+
+                    WriteVerbose($"Rollback cancelled: {cancelResult.Status}");
                 }
                 else
                 {
-                    WriteVerbose("Creating savepoint for rollback protection");
-                    var savepointTask = Task.Run(async () => await firewallService.CreateSavepointAsync());
-                    var savepointResult = savepointTask.GetAwaiter().GetResult();
-                    var revision = savepointResult.Revision;
-
-                    WriteVerbose($"Created savepoint with revision {revision}");
-                    WriteVerbose("Applying firewall changes with rollback protection");
-
-                    var applyTask = Task.Run(async () => await firewallService.ApplyChangesAsync(revision));
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"Firewall changes applied: {applyResult.Status}");
-
-                    if (CancelRollback.IsPresent)
-                    {
-                        WriteVerbose($"Waiting {Timeout} seconds before cancelling rollback");
-                        System.Threading.Thread.Sleep(Timeout * 1000);
-
-                        WriteVerbose("Cancelling automatic rollback");
-                        var cancelTask = Task.Run(async () => await firewallService.CancelRollbackAsync(revision));
-                        var cancelResult = cancelTask.GetAwaiter().GetResult();
-
-                        WriteVerbose($"Rollback cancelled: {cancelResult.Status}");
-                    }
-                    else
-                    {
-                        WriteVerbose($"Automatic rollback will occur in 60 seconds if connectivity is lost");
-                    }
+                    WriteVerbose($"Automatic rollback will occur in 60 seconds if connectivity is lost");
                 }
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
             }
         }
     }

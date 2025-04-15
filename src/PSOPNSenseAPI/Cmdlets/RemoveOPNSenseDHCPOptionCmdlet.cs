@@ -52,44 +52,54 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var dhcpService = new DHCPService(ApiClient, Logger);
+
+            // Get the option details for the confirmation message
+            var getResult = ExecuteAsyncTask(() => dhcpService.GetOptionAsync(Interface, Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var dhcpService = new DHCPService(ApiClient, Logger);
+                return;
+            }
 
-                // Get the option details for the confirmation message
-                var getTask = Task.Run(async () => await dhcpService.GetOptionAsync(Interface, Uuid));
-                var option = getTask.GetAwaiter().GetResult().Option;
+            var option = getResult.Option;
 
-                string confirmMessage = $"DHCP option: {option.Number} = {option.Value}";
-                if (!string.IsNullOrEmpty(option.Description))
-                {
-                    confirmMessage += $" ({option.Description})";
-                }
+            string confirmMessage = $"DHCP option: {option.Number} = {option.Value}";
+            if (!string.IsNullOrEmpty(option.Description))
+            {
+                confirmMessage += $" ({option.Description})";
+            }
 
-                if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            {
+                return;
+            }
+
+            var deleteResult = ExecuteAsyncTask(() => dhcpService.DeleteOptionAsync(Interface, Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || deleteResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"DHCP option {Uuid} removed: {deleteResult.Result}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => dhcpService.ApplyChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
                 {
                     return;
                 }
 
-                var deleteTask = Task.Run(async () => await dhcpService.DeleteOptionAsync(Interface, Uuid));
-                var deleteResult = deleteTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"DHCP option {Uuid} removed: {deleteResult.Result}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await dhcpService.ApplyChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"DHCP changes applied: {applyResult.Status}");
-                }
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
+                WriteVerbose($"DHCP changes applied: {applyResult.Status}");
             }
         }
     }

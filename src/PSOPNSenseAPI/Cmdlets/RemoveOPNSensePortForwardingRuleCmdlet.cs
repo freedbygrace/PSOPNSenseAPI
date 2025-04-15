@@ -13,7 +13,7 @@ namespace PSOPNSenseAPI.Cmdlets
     /// </example>
     /// </summary>
     [Cmdlet(VerbsCommon.Remove, "OPNSensePortForwardingRule", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
-    public class RemoveOPNSensePortForwardingRuleCmdlet : OPNSenseCmdlet
+    public class RemoveOPNSensePortForwardingRuleCmdlet : OPNSenseBaseCmdlet
     {
         /// <summary>
         /// <para type="description">The UUID of the port forwarding rule to remove.</para>
@@ -30,12 +30,18 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            var portForwardingService = new PortForwardingService(SessionState.ApiClient);
+            var portForwardingService = new PortForwardingService(ApiClient);
 
             // Get the rule to display information in the confirmation message
-            var rule = Task.Run(async () => await portForwardingService.GetPortForwardingRuleAsync(Uuid)).GetAwaiter().GetResult();
+            var rule = ExecuteAsyncTask(() => portForwardingService.GetPortForwardingRuleAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null)
+            {
+                return;
+            }
 
             if (rule == null)
             {
@@ -52,7 +58,13 @@ namespace PSOPNSenseAPI.Cmdlets
 
             if (Force || ShouldProcess($"OPNSense firewall", confirmationMessage))
             {
-                var success = Task.Run(async () => await portForwardingService.DeletePortForwardingRuleAsync(Uuid)).GetAwaiter().GetResult();
+                var success = ExecuteAsyncTask(() => portForwardingService.DeletePortForwardingRuleAsync(Uuid));
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null)
+                {
+                    return;
+                }
 
                 if (success)
                 {
@@ -60,11 +72,8 @@ namespace PSOPNSenseAPI.Cmdlets
                 }
                 else
                 {
-                    WriteError(new ErrorRecord(
-                        new PSInvalidOperationException($"Failed to remove port forwarding rule with UUID '{Uuid}'."),
-                        "PortForwardingRuleRemovalFailed",
-                        ErrorCategory.InvalidOperation,
-                        Uuid));
+                    ProcessingException = new PSInvalidOperationException($"Failed to remove port forwarding rule with UUID '{Uuid}'.");
+                    WriteWarning($"Failed to remove port forwarding rule with UUID '{Uuid}'.");
                 }
             }
         }

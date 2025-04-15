@@ -19,7 +19,7 @@ namespace PSOPNSenseAPI.Cmdlets
     /// </summary>
     [Cmdlet(VerbsCommon.Get, "OPNSensePortForwardingRule")]
     [OutputType(typeof(PortForwardingRule))]
-    public class GetOPNSensePortForwardingRuleCmdlet : OPNSenseCmdlet
+    public class GetOPNSensePortForwardingRuleCmdlet : OPNSenseBaseCmdlet
     {
         /// <summary>
         /// <para type="description">The UUID of the port forwarding rule to get. If not specified, all rules are returned.</para>
@@ -30,14 +30,21 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            var portForwardingService = new PortForwardingService(SessionState.ApiClient);
+            var portForwardingService = new PortForwardingService(ApiClient);
 
             if (!string.IsNullOrEmpty(Uuid))
             {
-                // Get a specific rule
-                var rule = Task.Run(async () => await portForwardingService.GetPortForwardingRuleAsync(Uuid)).GetAwaiter().GetResult();
+                // Use our safe execution method
+                var rule = ExecuteAsyncTask(() => portForwardingService.GetPortForwardingRuleAsync(Uuid));
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null)
+                {
+                    return;
+                }
+
                 if (rule != null)
                 {
                     WriteObject(rule);
@@ -49,8 +56,15 @@ namespace PSOPNSenseAPI.Cmdlets
             }
             else
             {
-                // Get all rules
-                var rules = Task.Run(async () => await portForwardingService.GetPortForwardingRulesAsync()).GetAwaiter().GetResult();
+                // Use our safe execution method
+                var rules = ExecuteAsyncTask(() => portForwardingService.GetPortForwardingRulesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || rules == null)
+                {
+                    return;
+                }
+
                 WriteObject(rules, true);
             }
         }

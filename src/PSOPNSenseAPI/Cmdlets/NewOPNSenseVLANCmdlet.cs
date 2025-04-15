@@ -48,30 +48,29 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var interfaceService = new InterfaceService(ApiClient, Logger);
+
+            var vlan = new VLANConfig
             {
-                var interfaceService = new InterfaceService(ApiClient, Logger);
+                Interface = Interface,
+                Tag = Tag.ToString(),
+                Priority = Priority.ToString(),
+                Description = Description
+            };
 
-                var vlan = new VLANConfig
-                {
-                    Interface = Interface,
-                    Tag = Tag.ToString(),
-                    Priority = Priority.ToString(),
-                    Description = Description
-                };
+            // Use our safe execution method
+            var result = ExecuteAsyncTask(() => interfaceService.CreateVLANAsync(vlan));
 
-                var task = Task.Run(async () => await interfaceService.CreateVLANAsync(vlan));
-                var result = task.GetAwaiter().GetResult();
-
-                WriteVerbose($"Created VLAN with UUID {result.Uuid}");
-                WriteObject(result.Uuid);
-            }
-            catch (Exception ex)
+            // Only continue if no exception occurred
+            if (ProcessingException != null || result == null)
             {
-                HandleException(ex);
+                return;
             }
+
+            WriteVerbose($"Created VLAN with UUID {result.Uuid}");
+            WriteObject(result.Uuid);
         }
     }
 }

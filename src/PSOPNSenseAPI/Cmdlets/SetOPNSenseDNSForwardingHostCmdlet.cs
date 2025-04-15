@@ -69,61 +69,71 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var dnsService = new DNSService(ApiClient, Logger);
+
+            // Get current host
+            var getResult = ExecuteAsyncTask(() => dnsService.GetDNSForwardingHostAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var dnsService = new DNSService(ApiClient, Logger);
-
-                // Get current host
-                var getTask = Task.Run(async () => await dnsService.GetDNSForwardingHostAsync(Uuid));
-                var currentHost = getTask.GetAwaiter().GetResult().Host;
-
-                // Create updated host
-                var host = new DNSForwardingHostConfig
-                {
-                    Domain = Domain ?? currentHost.Domain,
-                    Server = Server ?? currentHost.Server,
-                    Description = Description ?? currentHost.Description
-                };
-
-                // Handle enabled/disabled state
-                if (Enabled.IsPresent && Disabled.IsPresent)
-                {
-                    WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
-                    host.Enabled = "1";
-                }
-                else if (Enabled.IsPresent)
-                {
-                    host.Enabled = "1";
-                }
-                else if (Disabled.IsPresent)
-                {
-                    host.Enabled = "0";
-                }
-                else
-                {
-                    host.Enabled = currentHost.Enabled;
-                }
-
-                // Update host
-                var updateTask = Task.Run(async () => await dnsService.UpdateDNSForwardingHostAsync(Uuid, host));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"DNS forwarding host {Uuid} updated: {updateResult.Result}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await dnsService.ApplyDNSChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"DNS changes applied: {applyResult.Status}");
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var currentHost = getResult.Host;
+
+            // Create updated host
+            var host = new DNSForwardingHostConfig
             {
-                HandleException(ex);
+                Domain = Domain ?? currentHost.Domain,
+                Server = Server ?? currentHost.Server,
+                Description = Description ?? currentHost.Description
+            };
+
+            // Handle enabled/disabled state
+            if (Enabled.IsPresent && Disabled.IsPresent)
+            {
+                WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
+                host.Enabled = "1";
+            }
+            else if (Enabled.IsPresent)
+            {
+                host.Enabled = "1";
+            }
+            else if (Disabled.IsPresent)
+            {
+                host.Enabled = "0";
+            }
+            else
+            {
+                host.Enabled = currentHost.Enabled;
+            }
+
+            // Update host
+            var updateResult = ExecuteAsyncTask(() => dnsService.UpdateDNSForwardingHostAsync(Uuid, host));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"DNS forwarding host {Uuid} updated: {updateResult.Result}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => dnsService.ApplyDNSChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"DNS changes applied: {applyResult.Status}");
             }
         }
     }
