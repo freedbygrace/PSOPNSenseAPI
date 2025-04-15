@@ -34,29 +34,34 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var cronService = new CronService(ApiClient, Logger);
+
+            // Use our safe execution method
+            var result = ExecuteAsyncTask(() => cronService.ToggleJobAsync(Uuid, true));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || result == null)
             {
-                var cronService = new CronService(ApiClient, Logger);
-
-                var task = Task.Run(async () => await cronService.ToggleJobAsync(Uuid, true));
-                var result = task.GetAwaiter().GetResult();
-
-                WriteVerbose($"Cron job {Uuid} enabled: {result.Result}");
-
-                // Apply the changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await cronService.ApplyChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-                    
-                    WriteVerbose($"Cron changes applied: {applyResult.Status}");
-                }
+                return;
             }
-            catch (Exception ex)
+
+            WriteVerbose($"Cron job {Uuid} enabled: {result.Result}");
+
+            // Apply the changes if requested
+            if (Apply.IsPresent)
             {
-                HandleException(ex);
+                // Use our safe execution method
+                var applyResult = ExecuteAsyncTask(() => cronService.ApplyChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"Cron changes applied: {applyResult.Status}");
             }
         }
     }

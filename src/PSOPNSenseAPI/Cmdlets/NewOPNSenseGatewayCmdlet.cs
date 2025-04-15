@@ -103,47 +103,52 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var gatewayService = new GatewayService(ApiClient, Logger);
+
+            var gateway = new GatewayConfig
             {
-                var gatewayService = new GatewayService(ApiClient, Logger);
+                Name = Name,
+                Interface = Interface,
+                IpAddress = IpAddress,
+                MonitorIp = MonitorIp ?? IpAddress,
+                Description = Description,
+                IsDefault = Default.IsPresent ? "1" : "0",
+                Disabled = Disabled.IsPresent ? "1" : "0",
+                Weight = Weight?.ToString() ?? "1",
+                IpProtocol = IpProtocol,
+                MonitorDisable = DisableMonitoring.IsPresent ? "1" : "0",
+                ForceDown = ForceDown.IsPresent ? "1" : "0"
+            };
 
-                var gateway = new GatewayConfig
+            // Use our safe execution method
+            var createResult = ExecuteAsyncTask(() => gatewayService.CreateGatewayAsync(gateway));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || createResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Created gateway with UUID {createResult.Uuid}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                // Use our safe execution method
+                var applyResult = ExecuteAsyncTask(() => gatewayService.ApplyGatewayChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
                 {
-                    Name = Name,
-                    Interface = Interface,
-                    IpAddress = IpAddress,
-                    MonitorIp = MonitorIp ?? IpAddress,
-                    Description = Description,
-                    IsDefault = Default.IsPresent ? "1" : "0",
-                    Disabled = Disabled.IsPresent ? "1" : "0",
-                    Weight = Weight?.ToString() ?? "1",
-                    IpProtocol = IpProtocol,
-                    MonitorDisable = DisableMonitoring.IsPresent ? "1" : "0",
-                    ForceDown = ForceDown.IsPresent ? "1" : "0"
-                };
-
-                var createTask = Task.Run(async () => await gatewayService.CreateGatewayAsync(gateway));
-                var createResult = createTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Created gateway with UUID {createResult.Uuid}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await gatewayService.ApplyGatewayChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"Gateway changes applied: {applyResult.Status}");
+                    return;
                 }
 
-                WriteObject(createResult.Uuid);
+                WriteVerbose($"Gateway changes applied: {applyResult.Status}");
             }
-            catch (Exception ex)
-            {
-                HandleException(ex);
-            }
+
+            WriteObject(createResult.Uuid);
         }
     }
 }

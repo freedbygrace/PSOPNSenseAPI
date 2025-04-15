@@ -66,33 +66,32 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var userService = new UserService(ApiClient, Logger);
+
+            var user = new UserConfig
             {
-                var userService = new UserService(ApiClient, Logger);
+                Username = Username,
+                Password = Password,
+                FullName = FullName,
+                Email = Email,
+                Disabled = Disabled.IsPresent ? "1" : "0",
+                Groups = Groups != null ? new List<string>(Groups) : new List<string>(),
+                Authorizations = Authorizations != null ? new List<string>(Authorizations) : new List<string>()
+            };
 
-                var user = new UserConfig
-                {
-                    Username = Username,
-                    Password = Password,
-                    FullName = FullName,
-                    Email = Email,
-                    Disabled = Disabled.IsPresent ? "1" : "0",
-                    Groups = Groups != null ? new List<string>(Groups) : new List<string>(),
-                    Authorizations = Authorizations != null ? new List<string>(Authorizations) : new List<string>()
-                };
+            // Use our safe execution method
+            var result = ExecuteAsyncTask(() => userService.CreateUserAsync(user));
 
-                var task = Task.Run(async () => await userService.CreateUserAsync(user));
-                var result = task.GetAwaiter().GetResult();
-
-                WriteVerbose($"Created user with UUID {result.Uuid}");
-                WriteObject(result.Uuid);
-            }
-            catch (Exception ex)
+            // Only continue if no exception occurred
+            if (ProcessingException != null || result == null)
             {
-                HandleException(ex);
+                return;
             }
+
+            WriteVerbose($"Created user with UUID {result.Uuid}");
+            WriteObject(result.Uuid);
         }
     }
 }

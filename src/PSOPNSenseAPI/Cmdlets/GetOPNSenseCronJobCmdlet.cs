@@ -33,28 +33,35 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
-            {
-                var cronService = new CronService(ApiClient, Logger);
+            var cronService = new CronService(ApiClient, Logger);
 
-                if (ParameterSetName == "ByUuid")
-                {
-                    var task = Task.Run(async () => await cronService.GetJobAsync(Uuid));
-                    var result = task.GetAwaiter().GetResult();
-                    WriteObject(result.Job);
-                }
-                else
-                {
-                    var task = Task.Run(async () => await cronService.GetJobsAsync());
-                    var result = task.GetAwaiter().GetResult();
-                    WriteObject(result.Rows, true);
-                }
-            }
-            catch (Exception ex)
+            if (ParameterSetName == "ByUuid")
             {
-                HandleException(ex);
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => cronService.GetJobAsync(Uuid));
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
+                {
+                    return;
+                }
+
+                WriteObject(result.Job);
+            }
+            else
+            {
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => cronService.GetJobsAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
+                {
+                    return;
+                }
+
+                WriteObject(result.Rows, true);
             }
         }
     }

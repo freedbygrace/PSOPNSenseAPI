@@ -47,67 +47,69 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            if (!ShouldProcess("OPNSense firewall", "Update firmware"))
             {
-                if (!ShouldProcess("OPNSense firewall", "Update firmware"))
-                {
-                    return;
-                }
-
-                var firmwareService = new FirmwareService(ApiClient, Logger);
-
-                var task = Task.Run(async () => await firmwareService.UpdateAsync());
-                var result = task.GetAwaiter().GetResult();
-
-                WriteVerbose($"Firmware update initiated: {result.Status}");
-                WriteObject($"Firmware update initiated: {result.Status}");
-
-                if (Wait.IsPresent)
-                {
-                    WriteVerbose($"Waiting for firmware update to complete (timeout: {Timeout} seconds, interval: {Interval} seconds)");
-                    WriteObject("Waiting for firmware update to complete...");
-
-                    DateTime startTime = DateTime.Now;
-                    bool completed = false;
-
-                    while (DateTime.Now - startTime < TimeSpan.FromSeconds(Timeout))
-                    {
-                        var statusTask = Task.Run(async () => await firmwareService.GetStatusAsync());
-                        var statusResult = statusTask.GetAwaiter().GetResult();
-
-                        if (statusResult.Status == "done")
-                        {
-                            WriteVerbose("Firmware update completed successfully");
-                            WriteObject("Firmware update completed successfully");
-                            completed = true;
-                            break;
-                        }
-                        else if (statusResult.Status == "error")
-                        {
-                            WriteError(new ErrorRecord(
-                                new Exception($"Firmware update failed: {statusResult.Log}"),
-                                "FirmwareUpdateFailed",
-                                ErrorCategory.InvalidOperation,
-                                null));
-                            completed = true;
-                            break;
-                        }
-
-                        WriteVerbose($"Firmware update status: {statusResult.Status}");
-                        Thread.Sleep(Interval * 1000);
-                    }
-
-                    if (!completed)
-                    {
-                        WriteWarning($"Timed out waiting for firmware update to complete after {Timeout} seconds");
-                    }
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var firmwareService = new FirmwareService(ApiClient, Logger);
+
+            // Use our safe execution method
+            var result = ExecuteAsyncTask(() => firmwareService.UpdateAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || result == null)
             {
-                HandleException(ex);
+                return;
+            }
+
+            WriteVerbose($"Firmware update initiated: {result.Status}");
+            WriteObject($"Firmware update initiated: {result.Status}");
+
+            if (Wait.IsPresent)
+            {
+                WriteVerbose($"Waiting for firmware update to complete (timeout: {Timeout} seconds, interval: {Interval} seconds)");
+                WriteObject("Waiting for firmware update to complete...");
+
+                DateTime startTime = DateTime.Now;
+                bool completed = false;
+
+                while (DateTime.Now - startTime < TimeSpan.FromSeconds(Timeout))
+                {
+                    // Use our safe execution method
+                    var statusResult = ExecuteAsyncTask(() => firmwareService.GetStatusAsync());
+
+                    // Break if an exception occurred
+                    if (ProcessingException != null || statusResult == null)
+                    {
+                        break;
+                    }
+
+                    if (statusResult.Status == "done")
+                    {
+                        WriteVerbose("Firmware update completed successfully");
+                        WriteObject("Firmware update completed successfully");
+                        completed = true;
+                        break;
+                    }
+                    else if (statusResult.Status == "error")
+                    {
+                        // Store the exception to be processed in ProcessRecord
+                        ProcessingException = new Exception($"Firmware update failed: {statusResult.Log}");
+                        completed = true;
+                        break;
+                    }
+
+                    WriteVerbose($"Firmware update status: {statusResult.Status}");
+                    Thread.Sleep(Interval * 1000);
+                }
+
+                if (!completed && ProcessingException == null)
+                {
+                    WriteWarning($"Timed out waiting for firmware update to complete after {Timeout} seconds");
+                }
             }
         }
     }
