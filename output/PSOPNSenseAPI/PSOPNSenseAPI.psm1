@@ -7,8 +7,8 @@ $dllFiles = Get-ChildItem -Path $libPath -Filter "*.dll"
 foreach ($dll in $dllFiles) {
     try {
         $dllBytes = [System.IO.File]::ReadAllBytes($dll.FullName)
-        [System.Reflection.Assembly]::Load($dllBytes) | Out-Null
-        Write-Verbose "Loaded assembly: $($dll.Name)"
+        $Null = [System.Reflection.Assembly]::Load($dllBytes)
+        Write-Verbose "Attempting to load assembly: $($dll.FullName)"
     }
     catch {
         Write-Warning "Failed to load assembly $($dll.Name): $_"
