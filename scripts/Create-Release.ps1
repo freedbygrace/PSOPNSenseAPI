@@ -31,13 +31,38 @@ Copy-Item -Path "src\PSOPNSenseAPI\bin\Release\net472\*.dll" -Destination $libPa
 Remove-Item -Path "output\PSOPNSenseAPI\lib" -Recurse -Force -ErrorAction SilentlyContinue
 Rename-Item -Path $libPath -NewName "lib"
 
+# Create the PSM1 file
+$psm1Path = "output\PSOPNSenseAPI\PSOPNSenseAPI.psm1"
+$psm1Content = @"
+# Load assemblies from the lib folder using System.Reflection.Assembly::LoadBytes
+# This avoids file lock issues when the module is loaded
+
+`$libPath = Join-Path `$PSScriptRoot "lib"
+`$dllFiles = Get-ChildItem -Path `$libPath -Filter "*.dll"
+
+foreach (`$dll in `$dllFiles) {
+    try {
+        Write-Verbose "Attempting to load assembly: `$(`$dll.FullName)"
+        `$dllBytes = [System.IO.File]::ReadAllBytes(`$dll.FullName)
+        `$Null = [System.Reflection.Assembly]::Load(`$dllBytes)
+        Write-Verbose "Successfully loaded assembly: `$(`$dll.FullName)"
+    }
+    catch {
+        Write-Warning "Failed to load assembly `$(`$dll.Name): `$_"
+    }
+}
+
+# Export all cmdlets from the PSD1 file
+"@
+Set-Content -Path $psm1Path -Value $psm1Content
+
 # Create a release archive
 $zipFile = "output\PSOPNSenseAPI-$version.zip"
 Compress-Archive -Path "output\PSOPNSenseAPI\*" -DestinationPath $zipFile -Force
 
 # Clean up old zip files
-Get-ChildItem -Path "output" -Filter "*.zip" | 
-    Where-Object { $_.Name -ne "PSOPNSenseAPI-$version.zip" } | 
+Get-ChildItem -Path "output" -Filter "*.zip" |
+    Where-Object { $_.Name -ne "PSOPNSenseAPI-$version.zip" } |
     Remove-Item -Force
 
 # Commit the changes

@@ -8,7 +8,7 @@
     Description = 'PowerShell module for interacting with the OPNSense API to configure firewalls'
     PowerShellVersion = '5.1'
     CompatiblePSEditions = @('Desktop', 'Core')
-    DotNetFrameworkVersion = '4.7.2'
+    #DotNetFrameworkVersion = '4.7.2'
     CLRVersion = '4.0.0'
     FunctionsToExport = @()
     CmdletsToExport = @(
