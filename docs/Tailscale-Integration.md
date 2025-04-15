@@ -6,6 +6,8 @@ This component provides cmdlets for managing Tailscale VPN on OPNSense firewalls
 
 The Tailscale Integration component allows you to install, configure, and manage Tailscale VPN on OPNSense firewalls. It provides cmdlets for enabling Tailscale, configuring subnet routes, and managing the Tailscale connection.
 
+The module will automatically install the Tailscale plugin if it doesn't exist, making it easy to set up Tailscale on a new OPNSense firewall.
+
 ## Cmdlets
 
 ### Get-OPNSenseTailscaleStatus
@@ -138,6 +140,53 @@ Apply-OPNSenseTailscaleChanges
 Apply-OPNSenseTailscaleChanges -Force
 ```
 
+### Connect-OPNSenseTailscale
+
+Connects to the Tailscale network using an authentication key.
+
+#### Parameters
+
+- **AuthKey** - The Tailscale authentication key.
+- **InstallIfMissing** - Installs the Tailscale plugin if it's not already installed.
+- **EnableIfDisabled** - Enables Tailscale if it's disabled.
+- **StartIfStopped** - Starts the Tailscale service if it's stopped.
+- **SubnetRoutes** - The subnet routes to advertise to Tailscale.
+- **AdvertiseRoutes** - Whether to advertise routes to Tailscale.
+- **Force** - Suppresses the confirmation prompt.
+- **PassThru** - Returns the Tailscale status.
+
+#### Examples
+
+```powershell
+# Connect to Tailscale with an auth key
+Connect-OPNSenseTailscale -AuthKey "tskey-auth-abcdef123456"
+
+# Connect to Tailscale with automatic installation and enablement
+Connect-OPNSenseTailscale -AuthKey "tskey-auth-abcdef123456" -InstallIfMissing -EnableIfDisabled -StartIfStopped
+
+# Connect to Tailscale and advertise subnet routes
+Connect-OPNSenseTailscale -AuthKey "tskey-auth-abcdef123456" -SubnetRoutes "192.168.1.0/24","10.0.0.0/8" -AdvertiseRoutes
+```
+
+### Disconnect-OPNSenseTailscale
+
+Disconnects from the Tailscale network.
+
+#### Parameters
+
+- **Force** - Suppresses the confirmation prompt.
+- **PassThru** - Returns the Tailscale status.
+
+#### Examples
+
+```powershell
+# Disconnect from Tailscale
+Disconnect-OPNSenseTailscale
+
+# Disconnect from Tailscale without confirmation
+Disconnect-OPNSenseTailscale -Force
+```
+
 ## Common Scenarios
 
 ### Installing and Configuring Tailscale
@@ -154,6 +203,19 @@ Enable-OPNSenseTailscale -AuthKey "tskey-auth-abcdef123456" -Hostname "opnsense-
 
 # Apply the changes
 Apply-OPNSenseTailscaleChanges -Force
+
+# Disconnect from the firewall
+Disconnect-OPNSense
+```
+
+### Simplified Installation and Connection
+
+```powershell
+# Connect to the OPNSense firewall
+Connect-OPNSense -Server "https://firewall.example.com" -ApiKey "your_api_key" -ApiSecret "your_api_secret" -SkipCertificateCheck
+
+# Connect to Tailscale with automatic installation and enablement
+Connect-OPNSenseTailscale -AuthKey "tskey-auth-abcdef123456" -InstallIfMissing -EnableIfDisabled -StartIfStopped -Force
 
 # Disconnect from the firewall
 Disconnect-OPNSense
@@ -177,14 +239,8 @@ foreach ($interface in $interfaces) {
     }
 }
 
-# Join the subnets with commas
-$advertisedRoutes = $subnets -join ","
-
-# Enable Tailscale with route advertisement
-Enable-OPNSenseTailscale -AuthKey "tskey-auth-abcdef123456" -AdvertiseRoutes $advertisedRoutes -Force
-
-# Apply the changes
-Apply-OPNSenseTailscaleChanges -Force
+# Connect to Tailscale with subnet route advertisement
+Connect-OPNSenseTailscale -AuthKey "tskey-auth-abcdef123456" -SubnetRoutes $subnets -AdvertiseRoutes -InstallIfMissing -Force
 
 # Disconnect from the firewall
 Disconnect-OPNSense
@@ -201,6 +257,26 @@ Enable-OPNSenseTailscale -AuthKey "tskey-auth-abcdef123456" -ExitNode -Force
 
 # Apply the changes
 Apply-OPNSenseTailscaleChanges -Force
+
+# Disconnect from the firewall
+Disconnect-OPNSense
+```
+
+### Connecting and Disconnecting from Tailscale
+
+```powershell
+# Connect to the OPNSense firewall
+Connect-OPNSense -Server "https://firewall.example.com" -ApiKey "your_api_key" -ApiSecret "your_api_secret" -SkipCertificateCheck
+
+# Connect to Tailscale
+Connect-OPNSenseTailscale -AuthKey "tskey-auth-abcdef123456" -InstallIfMissing -EnableIfDisabled -StartIfStopped -Force
+
+# Get Tailscale status
+$status = Get-OPNSenseTailscaleStatus
+Write-Output "Tailscale Status: $($status.Status)"
+
+# Disconnect from Tailscale
+Disconnect-OPNSenseTailscale -Force
 
 # Disconnect from the firewall
 Disconnect-OPNSense
@@ -253,6 +329,7 @@ Disconnect-OPNSense
 
 - Tailscale requires the Tailscale plugin to be installed on the OPNSense firewall.
 - The `Install-OPNSenseTailscale` cmdlet will install the plugin if it's not already installed.
+- The `Connect-OPNSenseTailscale` cmdlet can automatically install the plugin, enable Tailscale, and start the service with the `-InstallIfMissing`, `-EnableIfDisabled`, and `-StartIfStopped` parameters.
 - Tailscale authentication keys can be generated from the Tailscale admin console.
 - Authentication keys are single-use and expire after a short period.
 - When advertising routes, ensure that the routes are valid and do not overlap with Tailscale's internal routes.
@@ -261,3 +338,5 @@ Disconnect-OPNSense
 - The `ExitNode` option allows other Tailscale nodes to use the OPNSense firewall as an internet gateway.
 - Changes to Tailscale settings are not applied until you call `Apply-OPNSenseTailscaleChanges`.
 - Consider using the `-PassThru` parameter when updating Tailscale settings to verify the changes.
+- The `Connect-OPNSenseTailscale` cmdlet combines multiple steps (installation, enablement, and connection) into a single command.
+- The `Disconnect-OPNSenseTailscale` cmdlet disconnects from the Tailscale network but does not disable Tailscale.
