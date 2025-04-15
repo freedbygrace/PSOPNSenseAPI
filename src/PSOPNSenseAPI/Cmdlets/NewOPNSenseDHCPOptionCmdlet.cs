@@ -61,40 +61,45 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var dhcpService = new DHCPService(ApiClient, Logger);
+
+            var option = new DHCPOptionConfig
             {
-                var dhcpService = new DHCPService(ApiClient, Logger);
+                Number = Number,
+                Value = Value,
+                Type = Type,
+                Description = Description
+            };
 
-                var option = new DHCPOptionConfig
+            // Use our safe execution method
+            var createResult = ExecuteAsyncTask(() => dhcpService.CreateOptionAsync(Interface, option));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || createResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Created DHCP option with UUID {createResult.Uuid}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                // Use our safe execution method
+                var applyResult = ExecuteAsyncTask(() => dhcpService.ApplyChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
                 {
-                    Number = Number,
-                    Value = Value,
-                    Type = Type,
-                    Description = Description
-                };
-
-                var createTask = Task.Run(async () => await dhcpService.CreateOptionAsync(Interface, option));
-                var createResult = createTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Created DHCP option with UUID {createResult.Uuid}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await dhcpService.ApplyChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"DHCP changes applied: {applyResult.Status}");
+                    return;
                 }
 
-                WriteObject(createResult.Uuid);
+                WriteVerbose($"DHCP changes applied: {applyResult.Status}");
             }
-            catch (Exception ex)
-            {
-                HandleException(ex);
-            }
+
+            WriteObject(createResult.Uuid);
         }
     }
 }

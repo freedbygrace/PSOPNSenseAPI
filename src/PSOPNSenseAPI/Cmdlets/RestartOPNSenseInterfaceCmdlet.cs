@@ -34,26 +34,25 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            if (!Force.IsPresent && !ShouldProcess(Name, "Restart interface"))
             {
-                if (!Force.IsPresent && !ShouldProcess(Name, "Restart interface"))
-                {
-                    return;
-                }
-
-                var interfaceService = new InterfaceService(ApiClient, Logger);
-
-                var task = Task.Run(async () => await interfaceService.RestartInterfaceAsync(Name));
-                var result = task.GetAwaiter().GetResult();
-
-                WriteVerbose($"Interface {Name} restarted: {result.Status}");
+                return;
             }
-            catch (Exception ex)
+
+            var interfaceService = new InterfaceService(ApiClient, Logger);
+
+            // Use our safe execution method
+            var result = ExecuteAsyncTask(() => interfaceService.RestartInterfaceAsync(Name));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || result == null)
             {
-                HandleException(ex);
+                return;
             }
+
+            WriteVerbose($"Interface {Name} restarted: {result.Status}");
         }
     }
 }

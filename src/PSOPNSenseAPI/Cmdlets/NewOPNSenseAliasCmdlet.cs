@@ -95,54 +95,59 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var aliasService = new AliasService(ApiClient, Logger);
+
+            var alias = new AliasConfig
             {
-                var aliasService = new AliasService(ApiClient, Logger);
+                Name = Name,
+                Type = Type.ToLower(),
+                Content = Content,
+                Description = Description,
+                Enabled = Disabled.IsPresent ? "0" : "1",
+                Counters = EnableCounters.IsPresent ? "1" : "0"
+            };
 
-                var alias = new AliasConfig
-                {
-                    Name = Name,
-                    Type = Type.ToLower(),
-                    Content = Content,
-                    Description = Description,
-                    Enabled = Disabled.IsPresent ? "0" : "1",
-                    Counters = EnableCounters.IsPresent ? "1" : "0"
-                };
-
-                // Set protocol for port aliases
-                if (Type.Equals("port", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(Protocol))
-                {
-                    alias.Protocol = Protocol.ToUpper();
-                }
-
-                // Set update frequency for URL aliases
-                if ((Type.Equals("url", StringComparison.OrdinalIgnoreCase) || Type.Equals("urltable", StringComparison.OrdinalIgnoreCase)) && UpdateFrequency.HasValue)
-                {
-                    alias.UpdateFrequency = UpdateFrequency.Value.ToString();
-                }
-
-                var createTask = Task.Run(async () => await aliasService.CreateAliasAsync(alias));
-                var createResult = createTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Created alias with UUID {createResult.Uuid}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await aliasService.ReconfigureAliasesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"Alias changes applied: {applyResult.Status}");
-                }
-
-                WriteObject(createResult.Uuid);
-            }
-            catch (Exception ex)
+            // Set protocol for port aliases
+            if (Type.Equals("port", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(Protocol))
             {
-                HandleException(ex);
+                alias.Protocol = Protocol.ToUpper();
             }
+
+            // Set update frequency for URL aliases
+            if ((Type.Equals("url", StringComparison.OrdinalIgnoreCase) || Type.Equals("urltable", StringComparison.OrdinalIgnoreCase)) && UpdateFrequency.HasValue)
+            {
+                alias.UpdateFrequency = UpdateFrequency.Value.ToString();
+            }
+
+            // Use our safe execution method
+            var createResult = ExecuteAsyncTask(() => aliasService.CreateAliasAsync(alias));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || createResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Created alias with UUID {createResult.Uuid}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                // Use our safe execution method
+                var applyResult = ExecuteAsyncTask(() => aliasService.ReconfigureAliasesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"Alias changes applied: {applyResult.Status}");
+            }
+
+            WriteObject(createResult.Uuid);
         }
     }
 }

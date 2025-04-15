@@ -55,105 +55,106 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            if (!Force.IsPresent && !ShouldProcess("OPNSense firewall", "Restart"))
             {
-                if (!Force.IsPresent && !ShouldProcess("OPNSense firewall", "Restart"))
-                {
-                    return;
-                }
-
-                var systemService = new SystemService(ApiClient, Logger);
-
-                // Store connection information for reconnection
-                string baseUrl = OPNSenseSession.BaseUrl;
-                string apiKey = null;
-                string apiSecret = null;
-                bool skipCertificateCheck = false;
-
-                // Extract connection information from the current session
-                if (ApiClient is OPNSenseApiClient client)
-                {
-                    baseUrl = client.BaseUrl;
-                    apiKey = client.ApiKey;
-                    apiSecret = client.ApiSecret;
-                    skipCertificateCheck = client.SkipCertificateCheck;
-                }
-
-                // If we couldn't get the credentials, we can't reconnect
-                if (Wait.IsPresent && (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(apiSecret)))
-                {
-                    WriteWarning("Could not retrieve API credentials from the current session. Will not attempt to reconnect after restart.");
-                    Wait = false;
-                }
-
-                // Restart the firewall
-                var task = Task.Run(async () => await systemService.RebootAsync());
-                var result = task.GetAwaiter().GetResult();
-
-                WriteVerbose($"Firewall restart initiated: {result.Status}");
-                WriteObject("Firewall restart initiated. The firewall is now restarting.");
-
-                // Wait for the firewall to come back online if requested
-                if (Wait.IsPresent)
-                {
-                    WriteVerbose($"Waiting for firewall to come back online (timeout: {Timeout} seconds, interval: {Interval} seconds)");
-                    WriteObject("Waiting for firewall to come back online...");
-
-                    // Disconnect the current session
-                    OPNSenseSession.Current?.Dispose();
-                    OPNSenseSession.Current = null;
-
-                    // Wait a bit for the firewall to start rebooting
-                    Thread.Sleep(5000);
-
-                    // Try to reconnect
-                    DateTime startTime = DateTime.Now;
-                    bool reconnected = false;
-
-                    while (DateTime.Now - startTime < TimeSpan.FromSeconds(Timeout))
-                    {
-                        try
-                        {
-                            WriteVerbose($"Attempting to reconnect to {baseUrl}...");
-
-                            // Create a new logger
-                            var logger = new PowerShellLogger(this);
-
-                            // Create a new API client
-                            var newClient = new OPNSenseApiClient(baseUrl, apiKey, apiSecret, skipCertificateCheck, logger);
-
-                            // Try to get the system status
-                            var statusService = new SystemService(newClient, logger);
-                            var statusTask = Task.Run(async () => await statusService.GetStatusAsync());
-                            var statusResult = statusTask.GetAwaiter().GetResult();
-
-                            // If we get here, the firewall is back online
-                            WriteVerbose("Successfully reconnected to the firewall");
-                            WriteObject($"Firewall is back online. Uptime: {statusResult.Uptime}");
-
-                            // Set the new session
-                            OPNSenseSession.Current = newClient;
-                            reconnected = true;
-                            break;
-                        }
-                        catch (Exception ex)
-                        {
-                            WriteVerbose($"Reconnection attempt failed: {ex.Message}");
-                            Thread.Sleep(Interval * 1000);
-                        }
-                    }
-
-                    if (!reconnected)
-                    {
-                        WriteWarning($"Timed out waiting for firewall to come back online after {Timeout} seconds");
-                    }
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var systemService = new SystemService(ApiClient, Logger);
+
+            // Store connection information for reconnection
+            string baseUrl = OPNSenseSession.BaseUrl;
+            string apiKey = null;
+            string apiSecret = null;
+            bool skipCertificateCheck = false;
+
+            // Extract connection information from the current session
+            if (ApiClient is OPNSenseApiClient client)
             {
-                HandleException(ex);
+                baseUrl = client.BaseUrl;
+                apiKey = client.ApiKey;
+                apiSecret = client.ApiSecret;
+                skipCertificateCheck = client.SkipCertificateCheck;
+            }
+
+            // If we couldn't get the credentials, we can't reconnect
+            if (Wait.IsPresent && (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(apiSecret)))
+            {
+                WriteWarning("Could not retrieve API credentials from the current session. Will not attempt to reconnect after restart.");
+                Wait = false;
+            }
+
+            // Restart the firewall
+            var result = ExecuteAsyncTask(() => systemService.RebootAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || result == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Firewall restart initiated: {result.Status}");
+            WriteObject("Firewall restart initiated. The firewall is now restarting.");
+
+            // Wait for the firewall to come back online if requested
+            if (Wait.IsPresent)
+            {
+                WriteVerbose($"Waiting for firewall to come back online (timeout: {Timeout} seconds, interval: {Interval} seconds)");
+                WriteObject("Waiting for firewall to come back online...");
+
+                // Disconnect the current session
+                OPNSenseSession.Current?.Dispose();
+                OPNSenseSession.Current = null;
+
+                // Wait a bit for the firewall to start rebooting
+                Thread.Sleep(5000);
+
+                // Try to reconnect
+                DateTime startTime = DateTime.Now;
+                bool reconnected = false;
+
+                while (DateTime.Now - startTime < TimeSpan.FromSeconds(Timeout))
+                {
+                    try
+                    {
+                        WriteVerbose($"Attempting to reconnect to {baseUrl}...");
+
+                        // Create a new logger
+                        var logger = new PowerShellLogger(this);
+
+                        // Create a new API client
+                        var newClient = new OPNSenseApiClient(baseUrl, apiKey, apiSecret, skipCertificateCheck, logger);
+
+                        // Try to get the system status
+                        var statusService = new SystemService(newClient, logger);
+
+                        // We need to use Task.Run here because we're creating a new client
+                        // and can't use ExecuteAsyncTask which uses the existing client
+                        var statusTask = Task.Run(async () => await statusService.GetStatusAsync());
+                        var statusResult = statusTask.GetAwaiter().GetResult();
+
+                        // If we get here, the firewall is back online
+                        WriteVerbose("Successfully reconnected to the firewall");
+                        WriteObject($"Firewall is back online. Uptime: {statusResult.Uptime}");
+
+                        // Set the new session
+                        OPNSenseSession.Current = newClient;
+                        reconnected = true;
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        WriteVerbose($"Reconnection attempt failed: {ex.Message}");
+                        Thread.Sleep(Interval * 1000);
+                    }
+                }
+
+                if (!reconnected)
+                {
+                    WriteWarning($"Timed out waiting for firewall to come back online after {Timeout} seconds");
+                }
             }
         }
     }
