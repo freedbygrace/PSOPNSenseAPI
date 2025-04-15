@@ -64,127 +64,101 @@
 
     # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
     CmdletsToExport = @(
-        # Connection
-        'Connect-OPNSense',
-        'Disconnect-OPNSense',
-
-        # Firewall Rules
-        'Get-OPNSenseFirewallRule',
-        'New-OPNSenseFirewallRule',
-        'Set-OPNSenseFirewallRule',
-        'Remove-OPNSenseFirewallRule',
-        'Enable-OPNSenseFirewallRule',
-        'Disable-OPNSenseFirewallRule',
-        'Apply-OPNSenseFirewallChanges',
-
-        # Aliases
-        'Get-OPNSenseAlias',
-        'New-OPNSenseAlias',
-        'Set-OPNSenseAlias',
-        'Remove-OPNSenseAlias',
-
-        # Interfaces
-        'Get-OPNSenseInterface',
-        'Set-OPNSenseInterface',
-        'Get-OPNSenseVLAN',
-        'New-OPNSenseVLAN',
-        'Remove-OPNSenseVLAN',
-        'New-OPNSenseSubnetVLANs',
-
-        # DNS
-        'Get-OPNSenseDNSServer',
-        'Set-OPNSenseDNSServer',
-        'Get-OPNSenseDNSOverride',
-        'New-OPNSenseDNSOverride',
-        'Remove-OPNSenseDNSOverride',
-        'Get-OPNSenseDNSForwarding',
-        'Set-OPNSenseDNSForwarding',
-        'Get-OPNSenseDNSForwardingHost',
-        'New-OPNSenseDNSForwardingHost',
-        'Set-OPNSenseDNSForwardingHost',
-        'Remove-OPNSenseDNSForwardingHost',
-        'Get-OPNSenseSystemDNS',
-        'Set-OPNSenseSystemDNS',
-
-        # Configuration
-        'Backup-OPNSenseConfig',
-        'Restore-OPNSenseConfig',
-        'Export-OPNSenseConfig',
-        'Import-OPNSenseConfig',
-
-        # Plugins
-        'Get-OPNSensePlugin',
-        'Install-OPNSensePlugin',
-        'Uninstall-OPNSensePlugin',
-        'Enable-OPNSensePlugin',
-        'Disable-OPNSensePlugin',
-
-        # Users
-        'Get-OPNSenseUser',
-        'New-OPNSenseUser',
-        'Set-OPNSenseUser',
-        'Remove-OPNSenseUser',
-
-        # Firmware
-        'Get-OPNSenseFirmware',
-        'Update-OPNSenseFirmware',
-        'Upgrade-OPNSenseFirmware',
-
-        # System
-        'Restart-OPNSenseFirewall',
-
-        # DHCP
-        'Get-OPNSenseDHCPServer',
-        'Set-OPNSenseDHCPServer',
-        'Get-OPNSenseDHCPLease',
-        'Remove-OPNSenseDHCPLease',
-        'Get-OPNSenseDHCPStaticMapping',
-        'New-OPNSenseDHCPStaticMapping',
-        'Set-OPNSenseDHCPStaticMapping',
-        'Remove-OPNSenseDHCPStaticMapping',
-        'Get-OPNSenseDHCPOption',
-        'New-OPNSenseDHCPOption',
-        'Set-OPNSenseDHCPOption',
-        'Remove-OPNSenseDHCPOption',
-
-        # Cron
-        'Get-OPNSenseCronJob',
-        'New-OPNSenseCronJob',
-        'Set-OPNSenseCronJob',
-        'Remove-OPNSenseCronJob',
-        'Enable-OPNSenseCronJob',
-        'Disable-OPNSenseCronJob',
-
-        # Tailscale
-        'Get-OPNSenseTailscaleStatus',
-        'Enable-OPNSenseTailscale',
-        'Disable-OPNSenseTailscale',
-        'Connect-OPNSenseTailscale',
-        'Disconnect-OPNSenseTailscale',
-
-        # Network Utilities
-        'Invoke-OPNSenseNetworkCalculation',
-        'ConvertTo-OPNSenseNetworkNotation',
-
-        # Gateways and Routes
-        'Get-OPNSenseGateway',
-        'New-OPNSenseGateway',
-        'Set-OPNSenseGateway',
-        'Remove-OPNSenseGateway',
-        'Get-OPNSenseRoute',
-        'New-OPNSenseRoute',
-        'Set-OPNSenseRoute',
-        'Remove-OPNSenseRoute',
-
-        # Port Forwarding
-        'Get-OPNSensePortForwardingRule',
-        'New-OPNSensePortForwardingRule',
-        'Set-OPNSensePortForwardingRule',
-        'Remove-OPNSensePortForwardingRule'
+        'ApplyOPNSenseFirewallChanges',
+        'BackupOPNSenseConfig',
+        'ConnectOPNSense',
+        'ConnectOPNSenseTailscale',
+        'ConvertToOPNSenseNetworkNotation',
+        'DisableOPNSenseCronJob',
+        'DisableOPNSenseFirewallRule',
+        'DisableOPNSensePlugin',
+        'DisableOPNSenseTailscale',
+        'DisconnectOPNSense',
+        'DisconnectOPNSenseTailscale',
+        'EnableOPNSenseCronJob',
+        'EnableOPNSenseFirewallRule',
+        'EnableOPNSensePlugin',
+        'EnableOPNSenseTailscale',
+        'ExportOPNSenseConfig',
+        'GetOPNSenseAlias',
+        'GetOPNSenseConfigBackup',
+        'GetOPNSenseConnection',
+        'GetOPNSenseCronJob',
+        'GetOPNSenseDHCPLease',
+        'GetOPNSenseDHCPOption',
+        'GetOPNSenseDHCPServer',
+        'GetOPNSenseDHCPStaticMapping',
+        'GetOPNSenseDNSForwarding',
+        'GetOPNSenseDNSForwardingHost',
+        'GetOPNSenseDNSOverride',
+        'GetOPNSenseDNSServer',
+        'GetOPNSenseFirewallRule',
+        'GetOPNSenseFirmware',
+        'GetOPNSenseGateway',
+        'GetOPNSenseInterface',
+        'GetOPNSenseInterfaceStatistics',
+        'GetOPNSensePlugin',
+        'GetOPNSensePortForwardingRule',
+        'GetOPNSenseRoute',
+        'GetOPNSenseSystemDNS',
+        'GetOPNSenseTailscaleStatus',
+        'GetOPNSenseUser',
+        'GetOPNSenseVLAN',
+        'ImportOPNSenseConfig',
+        'InstallOPNSensePlugin',
+        'InvokeOPNSenseNetworkCalculation',
+        'NewOPNSenseAlias',
+        'NewOPNSenseCronJob',
+        'NewOPNSenseDHCPOption',
+        'NewOPNSenseDHCPStaticMapping',
+        'NewOPNSenseDNSForwardingHost',
+        'NewOPNSenseDNSOverride',
+        'NewOPNSenseFirewallRule',
+        'NewOPNSenseGateway',
+        'NewOPNSensePortForwardingRule',
+        'NewOPNSenseRoute',
+        'NewOPNSenseSubnetVLANs',
+        'NewOPNSenseUser',
+        'NewOPNSenseVLAN',
+        'RemoveOPNSenseAlias',
+        'RemoveOPNSenseCronJob',
+        'RemoveOPNSenseDHCPLease',
+        'RemoveOPNSenseDHCPOption',
+        'RemoveOPNSenseDHCPStaticMapping',
+        'RemoveOPNSenseDNSForwardingHost',
+        'RemoveOPNSenseDNSOverride',
+        'RemoveOPNSenseFirewallRule',
+        'RemoveOPNSenseGateway',
+        'RemoveOPNSensePortForwardingRule',
+        'RemoveOPNSenseRoute',
+        'RemoveOPNSenseUser',
+        'RemoveOPNSenseVLAN',
+        'RestartOPNSenseFirewall',
+        'RestartOPNSenseInterface',
+        'RestoreOPNSenseConfig',
+        'SetOPNSenseAlias',
+        'SetOPNSenseCronJob',
+        'SetOPNSenseDHCPOption',
+        'SetOPNSenseDHCPServer',
+        'SetOPNSenseDHCPStaticMapping',
+        'SetOPNSenseDNSForwarding',
+        'SetOPNSenseDNSForwardingHost',
+        'SetOPNSenseDNSServer',
+        'SetOPNSenseFirewallRule',
+        'SetOPNSenseGateway',
+        'SetOPNSenseInterface',
+        'SetOPNSensePortForwardingRule',
+        'SetOPNSenseRoute',
+        'SetOPNSenseSystemDNS',
+        'SetOPNSenseUser',
+        'SetOPNSenseVLAN',
+        'UninstallOPNSensePlugin',
+        'UpdateOPNSenseFirmware',
+        'UpgradeOPNSenseFirmware'
     )
 
     # Variables to export from this module
-    VariablesToExport = '*'
+    VariablesToExport = @()
 
     # Aliases to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no aliases to export.
     AliasesToExport = @()
