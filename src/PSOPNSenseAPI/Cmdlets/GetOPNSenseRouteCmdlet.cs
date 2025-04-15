@@ -33,28 +33,35 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
-            {
-                var routeService = new RouteService(ApiClient, Logger);
+            var routeService = new RouteService(ApiClient, Logger);
 
-                if (ParameterSetName == "ByUuid")
-                {
-                    var task = Task.Run(async () => await routeService.GetRouteAsync(Uuid));
-                    var result = task.GetAwaiter().GetResult();
-                    WriteObject(result.Route);
-                }
-                else
-                {
-                    var task = Task.Run(async () => await routeService.GetRoutesAsync());
-                    var result = task.GetAwaiter().GetResult();
-                    WriteObject(result.Rows, true);
-                }
-            }
-            catch (Exception ex)
+            if (ParameterSetName == "ByUuid")
             {
-                HandleException(ex);
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => routeService.GetRouteAsync(Uuid));
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
+                {
+                    return;
+                }
+
+                WriteObject(result.Route);
+            }
+            else
+            {
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => routeService.GetRoutesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
+                {
+                    return;
+                }
+
+                WriteObject(result.Rows, true);
             }
         }
     }

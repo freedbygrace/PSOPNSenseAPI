@@ -33,28 +33,35 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
-            {
-                var dnsService = new DNSService(ApiClient, Logger);
+            var dnsService = new DNSService(ApiClient, Logger);
 
-                if (ParameterSetName == "ByUuid")
-                {
-                    var task = Task.Run(async () => await dnsService.GetDNSOverrideAsync(Uuid));
-                    var result = task.GetAwaiter().GetResult();
-                    WriteObject(result.Host);
-                }
-                else
-                {
-                    var task = Task.Run(async () => await dnsService.GetDNSOverridesAsync());
-                    var result = task.GetAwaiter().GetResult();
-                    WriteObject(result.Rows, true);
-                }
-            }
-            catch (Exception ex)
+            if (ParameterSetName == "ByUuid")
             {
-                HandleException(ex);
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => dnsService.GetDNSOverrideAsync(Uuid));
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
+                {
+                    return;
+                }
+
+                WriteObject(result.Host);
+            }
+            else
+            {
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => dnsService.GetDNSOverridesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
+                {
+                    return;
+                }
+
+                WriteObject(result.Rows, true);
             }
         }
     }

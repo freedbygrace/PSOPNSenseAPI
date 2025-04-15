@@ -39,68 +39,80 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
-            {
-                var gatewayService = new GatewayService(ApiClient, Logger);
+            var gatewayService = new GatewayService(ApiClient, Logger);
 
-                if (ParameterSetName == "ByUuid")
+            if (ParameterSetName == "ByUuid")
+            {
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => gatewayService.GetGatewayAsync(Uuid));
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
                 {
-                    var task = Task.Run(async () => await gatewayService.GetGatewayAsync(Uuid));
-                    var result = task.GetAwaiter().GetResult();
-                    WriteObject(result.Gateway);
+                    return;
+                }
+
+                WriteObject(result.Gateway);
+            }
+            else
+            {
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => gatewayService.GetGatewaysAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
+                {
+                    return;
+                }
+
+                if (IncludeStatus.IsPresent)
+                {
+                    // Use our safe execution method
+                    var statusResult = ExecuteAsyncTask(() => gatewayService.GetGatewayStatusAsync());
+
+                    // Only continue if no exception occurred
+                    if (ProcessingException != null || statusResult == null)
+                    {
+                        return;
+                    }
+
+                    foreach (var gateway in result.Rows)
+                    {
+                        var gatewayWithStatus = new PSObject();
+                        gatewayWithStatus.Properties.Add(new PSNoteProperty("Uuid", gateway.Uuid));
+                        gatewayWithStatus.Properties.Add(new PSNoteProperty("Name", gateway.Name));
+                        gatewayWithStatus.Properties.Add(new PSNoteProperty("Interface", gateway.Interface));
+                        gatewayWithStatus.Properties.Add(new PSNoteProperty("IpAddress", gateway.IpAddress));
+                        gatewayWithStatus.Properties.Add(new PSNoteProperty("MonitorIp", gateway.MonitorIp));
+                        gatewayWithStatus.Properties.Add(new PSNoteProperty("Description", gateway.Description));
+                        gatewayWithStatus.Properties.Add(new PSNoteProperty("IsDefault", gateway.IsDefault == "1"));
+                        gatewayWithStatus.Properties.Add(new PSNoteProperty("Disabled", gateway.Disabled == "1"));
+
+                        if (statusResult.Items.ContainsKey(gateway.Name))
+                        {
+                            var status = statusResult.Items[gateway.Name];
+                            gatewayWithStatus.Properties.Add(new PSNoteProperty("Status", status.Status));
+                            gatewayWithStatus.Properties.Add(new PSNoteProperty("RTT", status.RTT));
+                            gatewayWithStatus.Properties.Add(new PSNoteProperty("StdDev", status.StdDev));
+                            gatewayWithStatus.Properties.Add(new PSNoteProperty("Loss", status.Loss));
+                        }
+                        else
+                        {
+                            gatewayWithStatus.Properties.Add(new PSNoteProperty("Status", "Unknown"));
+                            gatewayWithStatus.Properties.Add(new PSNoteProperty("RTT", "N/A"));
+                            gatewayWithStatus.Properties.Add(new PSNoteProperty("StdDev", "N/A"));
+                            gatewayWithStatus.Properties.Add(new PSNoteProperty("Loss", "N/A"));
+                        }
+
+                        WriteObject(gatewayWithStatus);
+                    }
                 }
                 else
                 {
-                    var task = Task.Run(async () => await gatewayService.GetGatewaysAsync());
-                    var result = task.GetAwaiter().GetResult();
-
-                    if (IncludeStatus.IsPresent)
-                    {
-                        var statusTask = Task.Run(async () => await gatewayService.GetGatewayStatusAsync());
-                        var statusResult = statusTask.GetAwaiter().GetResult();
-
-                        foreach (var gateway in result.Rows)
-                        {
-                            var gatewayWithStatus = new PSObject();
-                            gatewayWithStatus.Properties.Add(new PSNoteProperty("Uuid", gateway.Uuid));
-                            gatewayWithStatus.Properties.Add(new PSNoteProperty("Name", gateway.Name));
-                            gatewayWithStatus.Properties.Add(new PSNoteProperty("Interface", gateway.Interface));
-                            gatewayWithStatus.Properties.Add(new PSNoteProperty("IpAddress", gateway.IpAddress));
-                            gatewayWithStatus.Properties.Add(new PSNoteProperty("MonitorIp", gateway.MonitorIp));
-                            gatewayWithStatus.Properties.Add(new PSNoteProperty("Description", gateway.Description));
-                            gatewayWithStatus.Properties.Add(new PSNoteProperty("IsDefault", gateway.IsDefault == "1"));
-                            gatewayWithStatus.Properties.Add(new PSNoteProperty("Disabled", gateway.Disabled == "1"));
-
-                            if (statusResult.Items.ContainsKey(gateway.Name))
-                            {
-                                var status = statusResult.Items[gateway.Name];
-                                gatewayWithStatus.Properties.Add(new PSNoteProperty("Status", status.Status));
-                                gatewayWithStatus.Properties.Add(new PSNoteProperty("RTT", status.RTT));
-                                gatewayWithStatus.Properties.Add(new PSNoteProperty("StdDev", status.StdDev));
-                                gatewayWithStatus.Properties.Add(new PSNoteProperty("Loss", status.Loss));
-                            }
-                            else
-                            {
-                                gatewayWithStatus.Properties.Add(new PSNoteProperty("Status", "Unknown"));
-                                gatewayWithStatus.Properties.Add(new PSNoteProperty("RTT", "N/A"));
-                                gatewayWithStatus.Properties.Add(new PSNoteProperty("StdDev", "N/A"));
-                                gatewayWithStatus.Properties.Add(new PSNoteProperty("Loss", "N/A"));
-                            }
-
-                            WriteObject(gatewayWithStatus);
-                        }
-                    }
-                    else
-                    {
-                        WriteObject(result.Rows, true);
-                    }
+                    WriteObject(result.Rows, true);
                 }
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
             }
         }
     }

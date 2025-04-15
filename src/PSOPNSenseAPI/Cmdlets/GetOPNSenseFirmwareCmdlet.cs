@@ -55,57 +55,84 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var firmwareService = new FirmwareService(ApiClient, Logger);
+
+            switch (ParameterSetName)
             {
-                var firmwareService = new FirmwareService(ApiClient, Logger);
+                case "Changelog":
+                    // Use our safe execution method
+                    var changelogResult = ExecuteAsyncTask(() => firmwareService.GetChangelogAsync());
 
-                switch (ParameterSetName)
-                {
-                    case "Changelog":
-                        var changelogTask = Task.Run(async () => await firmwareService.GetChangelogAsync());
-                        var changelogResult = changelogTask.GetAwaiter().GetResult();
-                        WriteObject(changelogResult.Changelog);
-                        break;
+                    // Only continue if no exception occurred
+                    if (ProcessingException != null || changelogResult == null)
+                    {
+                        return;
+                    }
 
-                    case "Audit":
-                        var auditTask = Task.Run(async () => await firmwareService.GetAuditAsync());
-                        var auditResult = auditTask.GetAwaiter().GetResult();
-                        WriteObject(auditResult.Audit, true);
-                        break;
+                    WriteObject(changelogResult.Changelog);
+                    break;
 
-                    case "Health":
-                        var healthTask = Task.Run(async () => await firmwareService.GetHealthAsync());
-                        var healthResult = healthTask.GetAwaiter().GetResult();
-                        WriteObject(healthResult.Health);
-                        break;
+                case "Audit":
+                    // Use our safe execution method
+                    var auditResult = ExecuteAsyncTask(() => firmwareService.GetAuditAsync());
 
-                    case "Check":
-                        var checkTask = Task.Run(async () => await firmwareService.CheckForUpdatesAsync());
-                        var checkResult = checkTask.GetAwaiter().GetResult();
-                        WriteObject($"Check for updates: {checkResult.Status}");
-                        break;
+                    // Only continue if no exception occurred
+                    if (ProcessingException != null || auditResult == null)
+                    {
+                        return;
+                    }
 
-                    default:
-                        var statusTask = Task.Run(async () => await firmwareService.GetStatusAsync());
-                        var statusResult = statusTask.GetAwaiter().GetResult();
+                    WriteObject(auditResult.Audit, true);
+                    break;
 
-                        var firmware = new PSObject();
-                        firmware.Properties.Add(new PSNoteProperty("Status", statusResult.Status));
-                        firmware.Properties.Add(new PSNoteProperty("Connection", statusResult.Connection));
-                        firmware.Properties.Add(new PSNoteProperty("DownloadSize", statusResult.DownloadSize));
-                        firmware.Properties.Add(new PSNoteProperty("LastCheck", statusResult.LastCheck));
-                        firmware.Properties.Add(new PSNoteProperty("UpgradeMessage", statusResult.UpgradeMessage));
-                        firmware.Properties.Add(new PSNoteProperty("Updates", statusResult.Updates));
-                        
-                        WriteObject(firmware);
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
+                case "Health":
+                    // Use our safe execution method
+                    var healthResult = ExecuteAsyncTask(() => firmwareService.GetHealthAsync());
+
+                    // Only continue if no exception occurred
+                    if (ProcessingException != null || healthResult == null)
+                    {
+                        return;
+                    }
+
+                    WriteObject(healthResult.Health);
+                    break;
+
+                case "Check":
+                    // Use our safe execution method
+                    var checkResult = ExecuteAsyncTask(() => firmwareService.CheckForUpdatesAsync());
+
+                    // Only continue if no exception occurred
+                    if (ProcessingException != null || checkResult == null)
+                    {
+                        return;
+                    }
+
+                    WriteObject($"Check for updates: {checkResult.Status}");
+                    break;
+
+                default:
+                    // Use our safe execution method
+                    var statusResult = ExecuteAsyncTask(() => firmwareService.GetStatusAsync());
+
+                    // Only continue if no exception occurred
+                    if (ProcessingException != null || statusResult == null)
+                    {
+                        return;
+                    }
+
+                    var firmware = new PSObject();
+                    firmware.Properties.Add(new PSNoteProperty("Status", statusResult.Status));
+                    firmware.Properties.Add(new PSNoteProperty("Connection", statusResult.Connection));
+                    firmware.Properties.Add(new PSNoteProperty("DownloadSize", statusResult.DownloadSize));
+                    firmware.Properties.Add(new PSNoteProperty("LastCheck", statusResult.LastCheck));
+                    firmware.Properties.Add(new PSNoteProperty("UpgradeMessage", statusResult.UpgradeMessage));
+                    firmware.Properties.Add(new PSNoteProperty("Updates", statusResult.Updates));
+
+                    WriteObject(firmware);
+                    break;
             }
         }
     }
