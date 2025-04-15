@@ -33,64 +33,77 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var tailscaleService = new TailscaleService(ApiClient, Logger);
+
+            // Check if the plugin is installed
+            var isInstalled = ExecuteAsyncTask(() => tailscaleService.IsPluginInstalledAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null)
             {
-                var tailscaleService = new TailscaleService(ApiClient, Logger);
+                return;
+            }
 
-                // Check if the plugin is installed
-                var isInstalledTask = Task.Run(async () => await tailscaleService.IsPluginInstalledAsync());
-                var isInstalled = isInstalledTask.GetAwaiter().GetResult();
+            if (!isInstalled)
+            {
+                WriteWarning("Tailscale plugin is not installed on the OPNSense firewall.");
 
-                if (!isInstalled)
+                var statusResult = new PSObject();
+                statusResult.Properties.Add(new PSNoteProperty("PluginInstalled", false));
+                statusResult.Properties.Add(new PSNoteProperty("Running", false));
+                statusResult.Properties.Add(new PSNoteProperty("Enabled", false));
+                statusResult.Properties.Add(new PSNoteProperty("Status", "Plugin not installed"));
+
+                WriteObject(statusResult);
+                return;
+            }
+
+            // Get the status
+            var status = ExecuteAsyncTask(() => tailscaleService.GetStatusAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || status == null)
+            {
+                return;
+            }
+
+            var result = new PSObject();
+            result.Properties.Add(new PSNoteProperty("PluginInstalled", true));
+            result.Properties.Add(new PSNoteProperty("Running", status.Running));
+            result.Properties.Add(new PSNoteProperty("Enabled", status.Enabled));
+            result.Properties.Add(new PSNoteProperty("Status", status.Status));
+
+            // Get interfaces if requested
+            if (IncludeInterfaces.IsPresent)
+            {
+                var interfaces = ExecuteAsyncTask(() => tailscaleService.GetInterfacesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || interfaces == null)
                 {
-                    WriteWarning("Tailscale plugin is not installed on the OPNSense firewall.");
-
-                    var statusResult = new PSObject();
-                    statusResult.Properties.Add(new PSNoteProperty("PluginInstalled", false));
-                    statusResult.Properties.Add(new PSNoteProperty("Running", false));
-                    statusResult.Properties.Add(new PSNoteProperty("Enabled", false));
-                    statusResult.Properties.Add(new PSNoteProperty("Status", "Plugin not installed"));
-
-                    WriteObject(statusResult);
                     return;
                 }
 
-                // Get the status
-                var statusTask = Task.Run(async () => await tailscaleService.GetStatusAsync());
-                var status = statusTask.GetAwaiter().GetResult();
-
-                var result = new PSObject();
-                result.Properties.Add(new PSNoteProperty("PluginInstalled", true));
-                result.Properties.Add(new PSNoteProperty("Running", status.Running));
-                result.Properties.Add(new PSNoteProperty("Enabled", status.Enabled));
-                result.Properties.Add(new PSNoteProperty("Status", status.Status));
-
-                // Get interfaces if requested
-                if (IncludeInterfaces.IsPresent)
-                {
-                    var interfacesTask = Task.Run(async () => await tailscaleService.GetInterfacesAsync());
-                    var interfaces = interfacesTask.GetAwaiter().GetResult();
-
-                    result.Properties.Add(new PSNoteProperty("Interfaces", interfaces.Interfaces));
-                }
-
-                // Get settings if requested
-                if (IncludeSettings.IsPresent)
-                {
-                    var settingsTask = Task.Run(async () => await tailscaleService.GetSettingsAsync());
-                    var settings = settingsTask.GetAwaiter().GetResult();
-
-                    result.Properties.Add(new PSNoteProperty("Settings", settings.General));
-                }
-
-                WriteObject(result);
+                result.Properties.Add(new PSNoteProperty("Interfaces", interfaces.Interfaces));
             }
-            catch (Exception ex)
+
+            // Get settings if requested
+            if (IncludeSettings.IsPresent)
             {
-                HandleException(ex);
+                var settings = ExecuteAsyncTask(() => tailscaleService.GetSettingsAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || settings == null)
+                {
+                    return;
+                }
+
+                result.Properties.Add(new PSNoteProperty("Settings", settings.General));
             }
+
+            WriteObject(result);
         }
     }
 }

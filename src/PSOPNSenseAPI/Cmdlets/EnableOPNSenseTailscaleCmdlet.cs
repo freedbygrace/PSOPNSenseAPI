@@ -105,131 +105,164 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var tailscaleService = new TailscaleService(ApiClient, Logger);
+
+            // Check if the plugin is installed
+            var isInstalled = ExecuteAsyncTask(() => tailscaleService.IsPluginInstalledAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null)
             {
-                var tailscaleService = new TailscaleService(ApiClient, Logger);
+                return;
+            }
 
-                // Check if the plugin is installed
-                var isInstalledTask = Task.Run(async () => await tailscaleService.IsPluginInstalledAsync());
-                var isInstalled = isInstalledTask.GetAwaiter().GetResult();
-
-                if (!isInstalled)
+            if (!isInstalled)
+            {
+                if (!Force.IsPresent && !ShouldProcess("OPNSense firewall", "Install Tailscale plugin"))
                 {
-                    if (!Force.IsPresent && !ShouldProcess("OPNSense firewall", "Install Tailscale plugin"))
-                    {
-                        WriteWarning("Tailscale plugin is not installed and -Force was not specified. Operation cancelled.");
-                        return;
-                    }
-
-                    WriteVerbose("Tailscale plugin is not installed. Installing...");
-                    var installTask = Task.Run(async () => await tailscaleService.InstallPluginAsync());
-                    var installResult = installTask.GetAwaiter().GetResult();
-
-                    if (!installResult)
-                    {
-                        WriteError(new ErrorRecord(
-                            new Exception("Failed to install Tailscale plugin."),
-                            "TailscalePluginInstallFailed",
-                            ErrorCategory.InvalidOperation,
-                            null));
-                        return;
-                    }
-
-                    WriteVerbose("Tailscale plugin installed successfully.");
+                    WriteWarning("Tailscale plugin is not installed and -Force was not specified. Operation cancelled.");
+                    return;
                 }
 
-                // Get current settings
-                var settingsTask = Task.Run(async () => await tailscaleService.GetSettingsAsync());
-                var currentSettings = settingsTask.GetAwaiter().GetResult().General;
+                WriteVerbose("Tailscale plugin is not installed. Installing...");
+                var installResult = ExecuteAsyncTask(() => tailscaleService.InstallPluginAsync());
 
-                // Process subnet routes if provided
-                string routesToAdvertise = currentSettings.RoutesToAdvertise;
-                if (SubnetRoutes != null && SubnetRoutes.Length > 0)
-                {
-                    routesToAdvertise = string.Join(",", SubnetRoutes);
-                    WriteVerbose($"Advertising subnet routes: {routesToAdvertise}");
-
-                    // If routes are specified but AdvertiseRoutes is not set, enable it automatically
-                    if (!AdvertiseRoutes.IsPresent)
-                    {
-                        WriteVerbose("Automatically enabling route advertisement because subnet routes were specified.");
-                        AdvertiseRoutes = true;
-                    }
-                }
-
-                // Create new settings
-                var settings = new TailscaleSettings
-                {
-                    Enabled = "1",
-                    AcceptDns = AcceptDns.IsPresent ? "1" : "0",
-                    AcceptRoutes = AcceptRoutes.IsPresent ? "1" : "0",
-                    AdvertiseExitNode = AdvertiseExitNode.IsPresent ? "1" : "0",
-                    AdvertiseRoutes = AdvertiseRoutes.IsPresent ? "1" : "0",
-                    RoutesToAdvertise = routesToAdvertise,
-                    Hostname = Hostname ?? currentSettings.Hostname,
-                    LoginServer = LoginServer ?? currentSettings.LoginServer,
-                    Ssh = EnableSsh.IsPresent ? "1" : "0",
-                    Ephemeral = Ephemeral.IsPresent ? "1" : "0",
-                    ResetOnStart = ResetOnStart.IsPresent ? "1" : "0"
-                };
-
-                if (!ShouldProcess("OPNSense firewall", "Enable and configure Tailscale"))
+                // Only continue if no exception occurred
+                if (ProcessingException != null)
                 {
                     return;
                 }
 
-                // Update settings
-                var updateTask = Task.Run(async () => await tailscaleService.UpdateSettingsAsync(settings));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Tailscale settings updated: {updateResult.Result}");
-
-                // Get current status
-                var statusTask = Task.Run(async () => await tailscaleService.GetStatusAsync());
-                var status = statusTask.GetAwaiter().GetResult();
-
-                // Start or restart the service if requested
-                if (Restart.IsPresent || (Start.IsPresent && !status.Running))
+                if (!installResult)
                 {
-                    if (status.Running)
-                    {
-                        if (Restart.IsPresent)
-                        {
-                            WriteVerbose("Restarting Tailscale service...");
-                            var restartTask = Task.Run(async () => await tailscaleService.RestartServiceAsync());
-                            var restartResult = restartTask.GetAwaiter().GetResult();
-                            WriteVerbose($"Tailscale service restarted: {restartResult.Status}");
-                        }
-                    }
-                    else if (Start.IsPresent)
-                    {
-                        WriteVerbose("Starting Tailscale service...");
-                        var startTask = Task.Run(async () => await tailscaleService.StartServiceAsync());
-                        var startResult = startTask.GetAwaiter().GetResult();
-                        WriteVerbose($"Tailscale service started: {startResult.Status}");
-                    }
+                    ProcessingException = new Exception("Failed to install Tailscale plugin.");
+                    return;
                 }
 
-                // Get updated status
-                statusTask = Task.Run(async () => await tailscaleService.GetStatusAsync());
-                status = statusTask.GetAwaiter().GetResult();
-
-                // Create result object
-                var result = new PSObject();
-                result.Properties.Add(new PSNoteProperty("PluginInstalled", true));
-                result.Properties.Add(new PSNoteProperty("Enabled", status.Enabled));
-                result.Properties.Add(new PSNoteProperty("Running", status.Running));
-                result.Properties.Add(new PSNoteProperty("Status", status.Status));
-                result.Properties.Add(new PSNoteProperty("Settings", settings));
-
-                WriteObject(result);
+                WriteVerbose("Tailscale plugin installed successfully.");
             }
-            catch (Exception ex)
+
+            // Get current settings
+            var settingsResult = ExecuteAsyncTask(() => tailscaleService.GetSettingsAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || settingsResult == null)
             {
-                HandleException(ex);
+                return;
             }
+
+            var currentSettings = settingsResult.General;
+
+            // Process subnet routes if provided
+            string routesToAdvertise = currentSettings.RoutesToAdvertise;
+            if (SubnetRoutes != null && SubnetRoutes.Length > 0)
+            {
+                routesToAdvertise = string.Join(",", SubnetRoutes);
+                WriteVerbose($"Advertising subnet routes: {routesToAdvertise}");
+
+                // If routes are specified but AdvertiseRoutes is not set, enable it automatically
+                if (!AdvertiseRoutes.IsPresent)
+                {
+                    WriteVerbose("Automatically enabling route advertisement because subnet routes were specified.");
+                    AdvertiseRoutes = true;
+                }
+            }
+
+            // Create new settings
+            var settings = new TailscaleSettings
+            {
+                Enabled = "1",
+                AcceptDns = AcceptDns.IsPresent ? "1" : "0",
+                AcceptRoutes = AcceptRoutes.IsPresent ? "1" : "0",
+                AdvertiseExitNode = AdvertiseExitNode.IsPresent ? "1" : "0",
+                AdvertiseRoutes = AdvertiseRoutes.IsPresent ? "1" : "0",
+                RoutesToAdvertise = routesToAdvertise,
+                Hostname = Hostname ?? currentSettings.Hostname,
+                LoginServer = LoginServer ?? currentSettings.LoginServer,
+                Ssh = EnableSsh.IsPresent ? "1" : "0",
+                Ephemeral = Ephemeral.IsPresent ? "1" : "0",
+                ResetOnStart = ResetOnStart.IsPresent ? "1" : "0"
+            };
+
+            if (!ShouldProcess("OPNSense firewall", "Enable and configure Tailscale"))
+            {
+                return;
+            }
+
+            // Update settings
+            var updateResult = ExecuteAsyncTask(() => tailscaleService.UpdateSettingsAsync(settings));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Tailscale settings updated: {updateResult.Result}");
+
+            // Get current status
+            var status = ExecuteAsyncTask(() => tailscaleService.GetStatusAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || status == null)
+            {
+                return;
+            }
+
+            // Start or restart the service if requested
+            if (Restart.IsPresent || (Start.IsPresent && !status.Running))
+            {
+                if (status.Running)
+                {
+                    if (Restart.IsPresent)
+                    {
+                        WriteVerbose("Restarting Tailscale service...");
+                        var restartResult = ExecuteAsyncTask(() => tailscaleService.RestartServiceAsync());
+
+                        // Only continue if no exception occurred
+                        if (ProcessingException != null || restartResult == null)
+                        {
+                            return;
+                        }
+
+                        WriteVerbose($"Tailscale service restarted: {restartResult.Status}");
+                    }
+                }
+                else if (Start.IsPresent)
+                {
+                    WriteVerbose("Starting Tailscale service...");
+                    var startResult = ExecuteAsyncTask(() => tailscaleService.StartServiceAsync());
+
+                    // Only continue if no exception occurred
+                    if (ProcessingException != null || startResult == null)
+                    {
+                        return;
+                    }
+
+                    WriteVerbose($"Tailscale service started: {startResult.Status}");
+                }
+            }
+
+            // Get updated status
+            status = ExecuteAsyncTask(() => tailscaleService.GetStatusAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || status == null)
+            {
+                return;
+            }
+
+            // Create result object
+            var result = new PSObject();
+            result.Properties.Add(new PSNoteProperty("PluginInstalled", true));
+            result.Properties.Add(new PSNoteProperty("Enabled", status.Enabled));
+            result.Properties.Add(new PSNoteProperty("Running", status.Running));
+            result.Properties.Add(new PSNoteProperty("Status", status.Status));
+            result.Properties.Add(new PSNoteProperty("Settings", settings));
+
+            WriteObject(result);
         }
     }
 }

@@ -53,40 +53,45 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var dnsService = new DNSService(ApiClient, Logger);
+
+            var host = new DNSForwardingHostConfig
             {
-                var dnsService = new DNSService(ApiClient, Logger);
+                Domain = Domain,
+                Server = Server,
+                Description = Description,
+                Enabled = Enabled.IsPresent ? "1" : "0"
+            };
 
-                var host = new DNSForwardingHostConfig
+            // Use our safe execution method
+            var createResult = ExecuteAsyncTask(() => dnsService.CreateDNSForwardingHostAsync(host));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || createResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Created DNS forwarding host with UUID {createResult.Uuid}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                // Use our safe execution method
+                var applyResult = ExecuteAsyncTask(() => dnsService.ApplyDNSChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
                 {
-                    Domain = Domain,
-                    Server = Server,
-                    Description = Description,
-                    Enabled = Enabled.IsPresent ? "1" : "0"
-                };
-
-                var createTask = Task.Run(async () => await dnsService.CreateDNSForwardingHostAsync(host));
-                var createResult = createTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Created DNS forwarding host with UUID {createResult.Uuid}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await dnsService.ApplyDNSChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"DNS changes applied: {applyResult.Status}");
+                    return;
                 }
 
-                WriteObject(createResult.Uuid);
+                WriteVerbose($"DNS changes applied: {applyResult.Status}");
             }
-            catch (Exception ex)
-            {
-                HandleException(ex);
-            }
+
+            WriteObject(createResult.Uuid);
         }
     }
 }

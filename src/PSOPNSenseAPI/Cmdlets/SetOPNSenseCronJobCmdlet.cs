@@ -93,65 +93,75 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var cronService = new CronService(ApiClient, Logger);
+
+            // First, get the current job
+            var getResult = ExecuteAsyncTask(() => cronService.GetJobAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || getResult == null)
             {
-                var cronService = new CronService(ApiClient, Logger);
-
-                // First, get the current job
-                var getTask = Task.Run(async () => await cronService.GetJobAsync(Uuid));
-                var currentJob = getTask.GetAwaiter().GetResult().Job;
-
-                // Create the updated job
-                var job = new CronJobConfig
-                {
-                    Description = Description ?? currentJob.Description,
-                    Command = Command ?? currentJob.Command,
-                    Minutes = Minutes ?? currentJob.Minutes,
-                    Hours = Hours ?? currentJob.Hours,
-                    Days = Days ?? currentJob.Days,
-                    Months = Months ?? currentJob.Months,
-                    Weekdays = Weekdays ?? currentJob.Weekdays
-                };
-
-                // Handle enabled/disabled state
-                if (Enabled.IsPresent && Disabled.IsPresent)
-                {
-                    WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
-                    job.Enabled = "1";
-                }
-                else if (Enabled.IsPresent)
-                {
-                    job.Enabled = "1";
-                }
-                else if (Disabled.IsPresent)
-                {
-                    job.Enabled = "0";
-                }
-                else
-                {
-                    job.Enabled = currentJob.Enabled;
-                }
-
-                // Update the job
-                var updateTask = Task.Run(async () => await cronService.UpdateJobAsync(Uuid, job));
-                var updateResult = updateTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Cron job {Uuid} updated: {updateResult.Result}");
-
-                // Apply the changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await cronService.ApplyChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-                    
-                    WriteVerbose($"Cron changes applied: {applyResult.Status}");
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var currentJob = getResult.Job;
+
+            // Create the updated job
+            var job = new CronJobConfig
             {
-                HandleException(ex);
+                Description = Description ?? currentJob.Description,
+                Command = Command ?? currentJob.Command,
+                Minutes = Minutes ?? currentJob.Minutes,
+                Hours = Hours ?? currentJob.Hours,
+                Days = Days ?? currentJob.Days,
+                Months = Months ?? currentJob.Months,
+                Weekdays = Weekdays ?? currentJob.Weekdays
+            };
+
+            // Handle enabled/disabled state
+            if (Enabled.IsPresent && Disabled.IsPresent)
+            {
+                WriteWarning("Both -Enabled and -Disabled parameters were specified. Using -Enabled.");
+                job.Enabled = "1";
+            }
+            else if (Enabled.IsPresent)
+            {
+                job.Enabled = "1";
+            }
+            else if (Disabled.IsPresent)
+            {
+                job.Enabled = "0";
+            }
+            else
+            {
+                job.Enabled = currentJob.Enabled;
+            }
+
+            // Update the job
+            var updateResult = ExecuteAsyncTask(() => cronService.UpdateJobAsync(Uuid, job));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || updateResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Cron job {Uuid} updated: {updateResult.Result}");
+
+            // Apply the changes if requested
+            if (Apply.IsPresent)
+            {
+                var applyResult = ExecuteAsyncTask(() => cronService.ApplyChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
+                {
+                    return;
+                }
+
+                WriteVerbose($"Cron changes applied: {applyResult.Status}");
             }
         }
     }
