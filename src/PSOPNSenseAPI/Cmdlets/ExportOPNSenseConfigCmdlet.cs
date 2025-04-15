@@ -23,8 +23,8 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <para type="description">The path to save the configuration file.</para>
         /// </summary>
         [Parameter(Mandatory = true, Position = 0)]
-        [ValidateNotNullOrEmpty]
-        public string Path { get; set; }
+        [ValidateNotNull]
+        public FileInfo Path { get; set; }
 
         /// <summary>
         /// <para type="description">Overwrites the file if it exists.</para>
@@ -39,14 +39,16 @@ namespace PSOPNSenseAPI.Cmdlets
         {
             try
             {
+                string fullPath = Path.FullName;
+
                 // Check if the file exists
-                if (File.Exists(Path) && !Force.IsPresent)
+                if (File.Exists(fullPath) && !Force.IsPresent)
                 {
                     WriteError(new ErrorRecord(
-                        new IOException($"The file '{Path}' already exists. Use -Force to overwrite."),
+                        new IOException($"The file '{fullPath}' already exists. Use -Force to overwrite."),
                         "FileExists",
                         ErrorCategory.ResourceExists,
-                        Path));
+                        fullPath));
                     return;
                 }
 
@@ -56,16 +58,16 @@ namespace PSOPNSenseAPI.Cmdlets
                 var configContent = task.GetAwaiter().GetResult();
 
                 // Create the directory if it doesn't exist
-                var directory = System.IO.Path.GetDirectoryName(Path);
+                var directory = System.IO.Path.GetDirectoryName(fullPath);
                 if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 {
                     Directory.CreateDirectory(directory);
                 }
 
                 // Write the configuration to the file
-                File.WriteAllBytes(Path, configContent);
+                File.WriteAllBytes(fullPath, configContent);
 
-                WriteVerbose($"Exported configuration to {Path}");
+                WriteVerbose($"Exported configuration to {fullPath}");
             }
             catch (Exception ex)
             {

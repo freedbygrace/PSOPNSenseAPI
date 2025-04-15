@@ -5,11 +5,19 @@ All notable changes to the PSOPNSenseAPI module will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2025.04.15.0739] - 2025-04-15
+## [2025.04.15.1143] - 2025-04-15
+
+### Added
+- Added `Get-OPNSenseConfig` cmdlet that retrieves the OPNSense configuration as an XML document
 
 ### Changed
 - Renamed `Upgrade-OPNSenseFirmware` to `Start-OPNSenseFirmwareUpgrade` to resolve cmdlet name conflict
+- Updated `Restore-OPNSenseConfig` to accept an XML document from the pipeline or as a parameter
+- Changed `Export-OPNSenseConfig` and `Import-OPNSenseConfig` to use System.IO.FileInfo for the Path parameter
 - Added unit tests for firmware management cmdlets
+
+### Removed
+- Removed `Backup-OPNSenseConfig` cmdlet (use `Get-OPNSenseConfig` instead)
 
 ## [0.6.0] - 2025-04-14
 

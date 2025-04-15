@@ -141,9 +141,11 @@ Start-OPNSenseFirmwareUpgrade -Wait -Timeout 1200
 # Reboot firewall
 Restart-OPNSenseFirewall -Wait -Timeout 300
 
-# Backup and restore configuration
-Backup-OPNSenseConfig -Filename "pre-upgrade-backup"
-Export-OPNSenseConfig -Path "C:\Backups\opnsense-config.xml"
+# Configuration management
+Get-OPNSenseConfig | Restore-OPNSenseConfig -Force  # Get and restore configuration in one line
+$config = Get-OPNSenseConfig  # Get configuration as XML document
+Export-OPNSenseConfig -Path (New-Object System.IO.FileInfo "C:\Backups\opnsense-config.xml")
+Import-OPNSenseConfig -Path (New-Object System.IO.FileInfo "C:\Backups\opnsense-config.xml") -Force
 ```
 
 ## Documentation

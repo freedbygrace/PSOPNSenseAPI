@@ -23,8 +23,8 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <para type="description">The path to the configuration file.</para>
         /// </summary>
         [Parameter(Mandatory = true, Position = 0)]
-        [ValidateNotNullOrEmpty]
-        public string Path { get; set; }
+        [ValidateNotNull]
+        public FileInfo Path { get; set; }
 
         /// <summary>
         /// <para type="description">Suppresses the confirmation prompt.</para>
@@ -39,18 +39,20 @@ namespace PSOPNSenseAPI.Cmdlets
         {
             try
             {
+                string fullPath = Path.FullName;
+
                 // Check if the file exists
-                if (!File.Exists(Path))
+                if (!File.Exists(fullPath))
                 {
                     WriteError(new ErrorRecord(
-                        new FileNotFoundException($"The file '{Path}' does not exist."),
+                        new FileNotFoundException($"The file '{fullPath}' does not exist."),
                         "FileNotFound",
                         ErrorCategory.ObjectNotFound,
-                        Path));
+                        fullPath));
                     return;
                 }
 
-                if (!Force.IsPresent && !ShouldProcess(Path, "Import configuration"))
+                if (!Force.IsPresent && !ShouldProcess(fullPath, "Import configuration"))
                 {
                     return;
                 }
@@ -58,12 +60,12 @@ namespace PSOPNSenseAPI.Cmdlets
                 var configService = new ConfigService(ApiClient, Logger);
 
                 // Read the configuration file
-                var configContent = File.ReadAllBytes(Path);
+                var configContent = File.ReadAllBytes(fullPath);
 
                 var task = Task.Run(async () => await configService.ImportConfigAsync(configContent));
                 var result = task.GetAwaiter().GetResult();
 
-                WriteVerbose($"Imported configuration from {Path}: {result.Status}");
+                WriteVerbose($"Imported configuration from {fullPath}: {result.Status}");
                 WriteWarning("The firewall is restarting. You may need to reconnect after it comes back online.");
             }
             catch (Exception ex)
