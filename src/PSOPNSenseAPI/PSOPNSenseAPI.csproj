@@ -4,7 +4,7 @@
     <TargetFrameworks>netstandard2.0;net472</TargetFrameworks>
     <AssemblyName>PSOPNSenseAPI</AssemblyName>
     <RootNamespace>PSOPNSenseAPI</RootNamespace>
-    <Version>2025.04.14.2246</Version>
+    <Version>2025.04.14.2253</Version>
     <Authors>PSOPNSenseAPI Contributors</Authors>
     <Company>PSOPNSenseAPI</Company>
     <Description>PowerShell module for interacting with the OPNSense API to configure firewalls</Description>

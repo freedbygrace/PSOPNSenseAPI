@@ -11,9 +11,9 @@ namespace PSOPNSenseAPI.Tests
     [TestClass]
     public class InterfaceServiceTests
     {
-        private Mock<IOPNSenseApiClient> _mockApiClient;
-        private Mock<ILogger> _mockLogger;
-        private InterfaceService _interfaceService;
+        private Mock<IOPNSenseApiClient>? _mockApiClient;
+        private Mock<ILogger>? _mockLogger;
+        private InterfaceService? _interfaceService;
 
         [TestInitialize]
         public void Setup()
@@ -43,11 +43,11 @@ namespace PSOPNSenseAPI.Tests
                 }
             };
 
-            _mockApiClient.Setup(x => x.GetAsync<InterfaceListResponse>("interfaces/overview/searchInterfaces"))
+            _mockApiClient!.Setup(x => x.GetAsync<InterfaceListResponse>("interfaces/overview/searchInterfaces"))
                 .ReturnsAsync(response);
 
             // Act
-            var result = await _interfaceService.GetInterfacesAsync();
+            var result = await _interfaceService!.GetInterfacesAsync();
 
             // Assert
             Assert.IsNotNull(result);
@@ -78,11 +78,11 @@ namespace PSOPNSenseAPI.Tests
                 }
             };
 
-            _mockApiClient.Setup(x => x.GetAsync<InterfaceDetailResponse>($"interfaces/overview/getInterface/{interfaceName}"))
+            _mockApiClient!.Setup(x => x.GetAsync<InterfaceDetailResponse>($"interfaces/overview/getInterface/{interfaceName}"))
                 .ReturnsAsync(response);
 
             // Act
-            var result = await _interfaceService.GetInterfaceDetailAsync(interfaceName);
+            var result = await _interfaceService!.GetInterfaceDetailAsync(interfaceName);
 
             // Assert
             Assert.IsNotNull(result);
@@ -114,11 +114,11 @@ namespace PSOPNSenseAPI.Tests
                 Result = "saved"
             };
 
-            _mockApiClient.Setup(x => x.PostAsync<InterfaceUpdateResponse>($"interfaces/overview/setInterface/{interfaceName}", It.IsAny<object>()))
+            _mockApiClient!.Setup(x => x.PostAsync<InterfaceUpdateResponse>($"interfaces/overview/setInterface/{interfaceName}", It.IsAny<object>()))
                 .ReturnsAsync(response);
 
             // Act
-            var result = await _interfaceService.UpdateInterfaceAsync(interfaceName, interfaceConfig);
+            var result = await _interfaceService!.UpdateInterfaceAsync(interfaceName, interfaceConfig);
 
             // Assert
             Assert.IsNotNull(result);
