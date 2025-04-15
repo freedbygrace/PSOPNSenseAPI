@@ -23,7 +23,7 @@ namespace PSOPNSenseAPI.Cmdlets
     /// </summary>
     [Cmdlet(VerbsCommunications.Connect, "OPNSense")]
     [OutputType(typeof(void))]
-    public class ConnectOPNSenseCmdlet : PSCmdlet
+    public class ConnectOPNSenseCmdlet : OPNSenseBaseCmdlet
     {
         /// <summary>
         /// <para type="description">The URL of the OPNSense firewall.</para>
@@ -61,39 +61,28 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            // Check if already connected
+            if (OPNSenseSession.IsConnected && !Force.IsPresent)
             {
-                // Check if already connected
-                if (OPNSenseSession.IsConnected && !Force.IsPresent)
-                {
-                    WriteWarning($"Already connected to {OPNSenseSession.BaseUrl}. Use -Force to reconnect.");
-                    return;
-                }
-
-                // Dispose existing connection if there is one
-                OPNSenseSession.Current?.Dispose();
-
-                // Create a new logger
-                var logger = new PowerShellLogger(this);
-
-                // Create a new API client
-                var client = new OPNSenseApiClient(Server, ApiKey, ApiSecret, SkipCertificateCheck.IsPresent, logger);
-
-                // Set the current session
-                OPNSenseSession.Current = client;
-
-                WriteVerbose($"Connected to OPNSense firewall at {Server}");
+                WriteWarning($"Already connected to {OPNSenseSession.BaseUrl}. Use -Force to reconnect.");
+                return;
             }
-            catch (Exception ex)
-            {
-                WriteError(new ErrorRecord(
-                    ex,
-                    "ConnectionFailed",
-                    ErrorCategory.ConnectionError,
-                    Server));
-            }
+
+            // Dispose existing connection if there is one
+            OPNSenseSession.Current?.Dispose();
+
+            // Create a new logger
+            var logger = new PowerShellLogger(this);
+
+            // Create a new API client
+            var client = new OPNSenseApiClient(Server, ApiKey, ApiSecret, SkipCertificateCheck.IsPresent, logger);
+
+            // Set the current session
+            OPNSenseSession.Current = client;
+
+            WriteVerbose($"Connected to OPNSense firewall at {Server}");
         }
     }
 }

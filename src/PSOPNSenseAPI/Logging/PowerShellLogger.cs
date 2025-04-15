@@ -51,11 +51,9 @@ namespace PSOPNSenseAPI.Logging
         /// <param name="message">The message to log</param>
         public void Error(string message)
         {
-            _cmdlet.WriteError(new ErrorRecord(
-                new System.Exception(message),
-                "OPNSenseApiError",
-                ErrorCategory.NotSpecified,
-                null));
+            // Store the error message but don't call WriteError directly
+            // The cmdlet will handle writing the error in ProcessRecord
+            _cmdlet.WriteWarning($"Error: {message}");
         }
 
         /// <summary>

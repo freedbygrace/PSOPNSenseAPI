@@ -26,20 +26,16 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var dhcpService = new DHCPService(ApiClient, Logger);
+
+            var result = ExecuteAsyncTask(() => dhcpService.GetLeasesAsync());
+
+            // Only write output if no exception occurred
+            if (ProcessingException == null && result != null)
             {
-                var dhcpService = new DHCPService(ApiClient, Logger);
-
-                var task = Task.Run(async () => await dhcpService.GetLeasesAsync());
-                var result = task.GetAwaiter().GetResult();
-
                 WriteObject(result.Rows, true);
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
             }
         }
     }

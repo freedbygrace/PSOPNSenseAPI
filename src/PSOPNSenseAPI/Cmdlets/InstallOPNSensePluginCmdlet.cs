@@ -54,67 +54,72 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            if (!ShouldProcess(Name, "Install plugin"))
             {
-                if (!ShouldProcess(Name, "Install plugin"))
-                {
-                    return;
-                }
-
-                var pluginService = new PluginService(ApiClient, Logger);
-
-                var task = Task.Run(async () => await pluginService.InstallPluginAsync(Name));
-                var result = task.GetAwaiter().GetResult();
-
-                WriteVerbose($"Plugin installation initiated: {result.Status}");
-                WriteObject($"Plugin installation initiated: {result.Status}");
-
-                if (Wait.IsPresent)
-                {
-                    WriteVerbose($"Waiting for plugin installation to complete (timeout: {Timeout} seconds, interval: {Interval} seconds)");
-                    WriteObject("Waiting for plugin installation to complete...");
-
-                    DateTime startTime = DateTime.Now;
-                    bool completed = false;
-
-                    while (DateTime.Now - startTime < TimeSpan.FromSeconds(Timeout))
-                    {
-                        var statusTask = Task.Run(async () => await pluginService.GetPluginStatusAsync());
-                        var statusResult = statusTask.GetAwaiter().GetResult();
-
-                        if (statusResult.Status == "done")
-                        {
-                            WriteVerbose("Plugin installation completed successfully");
-                            WriteObject("Plugin installation completed successfully");
-                            completed = true;
-                            break;
-                        }
-                        else if (statusResult.Status == "error")
-                        {
-                            WriteError(new ErrorRecord(
-                                new Exception($"Plugin installation failed: {statusResult.Log}"),
-                                "PluginInstallationFailed",
-                                ErrorCategory.InvalidOperation,
-                                Name));
-                            completed = true;
-                            break;
-                        }
-
-                        WriteVerbose($"Plugin installation status: {statusResult.Status}");
-                        Thread.Sleep(Interval * 1000);
-                    }
-
-                    if (!completed)
-                    {
-                        WriteWarning($"Timed out waiting for plugin installation to complete after {Timeout} seconds");
-                    }
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var pluginService = new PluginService(ApiClient, Logger);
+
+            // Use our safe execution method
+            var result = ExecuteAsyncTask(() => pluginService.InstallPluginAsync(Name));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || result == null)
             {
-                HandleException(ex);
+                return;
+            }
+
+            WriteVerbose($"Plugin installation initiated: {result.Status}");
+            WriteObject($"Plugin installation initiated: {result.Status}");
+
+            if (Wait.IsPresent)
+            {
+                WriteVerbose($"Waiting for plugin installation to complete (timeout: {Timeout} seconds, interval: {Interval} seconds)");
+                WriteObject("Waiting for plugin installation to complete...");
+
+                DateTime startTime = DateTime.Now;
+                bool completed = false;
+
+                while (DateTime.Now - startTime < TimeSpan.FromSeconds(Timeout))
+                {
+                    // Use our safe execution method
+                    var statusResult = ExecuteAsyncTask(() => pluginService.GetPluginStatusAsync());
+
+                    // Break if an exception occurred
+                    if (ProcessingException != null || statusResult == null)
+                    {
+                        break;
+                    }
+
+                    if (statusResult.Status == "done")
+                    {
+                        WriteVerbose("Plugin installation completed successfully");
+                        WriteObject("Plugin installation completed successfully");
+                        completed = true;
+                        break;
+                    }
+                    else if (statusResult.Status == "error")
+                    {
+                        WriteError(new ErrorRecord(
+                            new Exception($"Plugin installation failed: {statusResult.Log}"),
+                            "PluginInstallationFailed",
+                            ErrorCategory.InvalidOperation,
+                            Name));
+                        completed = true;
+                        break;
+                    }
+
+                    WriteVerbose($"Plugin installation status: {statusResult.Status}");
+                    Thread.Sleep(Interval * 1000);
+                }
+
+                if (!completed && ProcessingException == null)
+                {
+                    WriteWarning($"Timed out waiting for plugin installation to complete after {Timeout} seconds");
+                }
             }
         }
     }
