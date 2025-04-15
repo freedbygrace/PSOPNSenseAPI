@@ -113,14 +113,24 @@ The solution includes unit tests that can be run from Visual Studio using the Te
 .\build\test.ps1
 ```
 
-## Manual Release Process
+## Release Process
 
-The project uses a manual release process. To create a new release:
+The project includes a script to automate the release process. To create a new release:
 
-1. Update the version in the project file and module manifest
+1. Run the `scripts\Create-Release.ps1` script
+2. Follow the instructions to create a GitHub release
+
+The script will:
+
+1. Update the version in the project file and module manifest to the current date and time (yyyy.MM.dd.HHmm)
 2. Build the solution in Release mode
-3. Create a zip file of the module
-4. Create a GitHub release with the zip file attached
+3. Copy the DLLs to the output folder
+4. Create a zip file of the module
+5. Clean up old zip files, keeping only the latest one
+6. Commit and push the changes
+7. Create a release note file
+
+After running the script, you'll need to manually create a GitHub release and attach the zip file.
 
 ## Dependencies
 
