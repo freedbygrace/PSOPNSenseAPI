@@ -3,7 +3,7 @@
     RootModule = 'PSOPNSenseAPI.psm1'
 
     # Version number of this module.
-    ModuleVersion = '2025.04.14.2340'
+    ModuleVersion = '2025.04.15.0739'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Desktop', 'Core')

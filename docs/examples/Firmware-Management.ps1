@@ -27,7 +27,8 @@ Write-Output "Firmware updated successfully"
 
 # Upgrade firmware (major version upgrade)
 # Note: This will restart the firewall
-# Upgrade-OPNSenseFirmware -Wait -Timeout 1200
+Start-OPNSenseFirmwareUpgrade -Wait -Timeout 1200
+Write-Output "Firmware upgraded successfully"
 
 # Restart the firewall
 Restart-OPNSenseFirewall -Wait -Timeout 300

@@ -135,6 +135,9 @@ Invoke-OPNSenseNetworkCalculation -Network "10.0.0.0/24" -Operation SupernetSumm
 # Firmware management
 Update-OPNSenseFirmware -Wait
 
+# Major firmware upgrade
+Start-OPNSenseFirmwareUpgrade -Wait -Timeout 1200
+
 # Reboot firewall
 Restart-OPNSenseFirewall -Wait -Timeout 300
 

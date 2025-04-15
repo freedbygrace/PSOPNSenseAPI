@@ -5,7 +5,11 @@ All notable changes to the PSOPNSenseAPI module will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2025.04.15.0739] - 2025-04-15
+
+### Changed
+- Renamed `Upgrade-OPNSenseFirmware` to `Start-OPNSenseFirmwareUpgrade` to resolve cmdlet name conflict
+- Added unit tests for firmware management cmdlets
 
 ## [0.6.0] - 2025-04-14
 
