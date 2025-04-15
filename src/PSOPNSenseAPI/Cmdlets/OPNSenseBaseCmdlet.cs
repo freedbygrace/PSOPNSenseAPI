@@ -73,14 +73,14 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Gets the logger
         /// </summary>
-        protected ILogger Logger { get; private set; }
+        protected ILogger Logger { get; set; }
 
 
 
         /// <summary>
         /// Exception to be processed in ProcessRecord
         /// </summary>
-        protected Exception ProcessingException { get; private set; }
+        protected Exception ProcessingException { get; set; }
 
         /// <summary>
         /// Handles exceptions by storing them for later processing

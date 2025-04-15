@@ -60,67 +60,69 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            if (!Force.IsPresent && !ShouldProcess(Name, "Uninstall plugin"))
             {
-                if (!Force.IsPresent && !ShouldProcess(Name, "Uninstall plugin"))
-                {
-                    return;
-                }
-
-                var pluginService = new PluginService(ApiClient, Logger);
-
-                var task = Task.Run(async () => await pluginService.UninstallPluginAsync(Name));
-                var result = task.GetAwaiter().GetResult();
-
-                WriteVerbose($"Plugin uninstallation initiated: {result.Status}");
-                WriteObject($"Plugin uninstallation initiated: {result.Status}");
-
-                if (Wait.IsPresent)
-                {
-                    WriteVerbose($"Waiting for plugin uninstallation to complete (timeout: {Timeout} seconds, interval: {Interval} seconds)");
-                    WriteObject("Waiting for plugin uninstallation to complete...");
-
-                    DateTime startTime = DateTime.Now;
-                    bool completed = false;
-
-                    while (DateTime.Now - startTime < TimeSpan.FromSeconds(Timeout))
-                    {
-                        var statusTask = Task.Run(async () => await pluginService.GetPluginStatusAsync());
-                        var statusResult = statusTask.GetAwaiter().GetResult();
-
-                        if (statusResult.Status == "done")
-                        {
-                            WriteVerbose("Plugin uninstallation completed successfully");
-                            WriteObject("Plugin uninstallation completed successfully");
-                            completed = true;
-                            break;
-                        }
-                        else if (statusResult.Status == "error")
-                        {
-                            WriteError(new ErrorRecord(
-                                new Exception($"Plugin uninstallation failed: {statusResult.Log}"),
-                                "PluginUninstallationFailed",
-                                ErrorCategory.InvalidOperation,
-                                Name));
-                            completed = true;
-                            break;
-                        }
-
-                        WriteVerbose($"Plugin uninstallation status: {statusResult.Status}");
-                        Thread.Sleep(Interval * 1000);
-                    }
-
-                    if (!completed)
-                    {
-                        WriteWarning($"Timed out waiting for plugin uninstallation to complete after {Timeout} seconds");
-                    }
-                }
+                return;
             }
-            catch (Exception ex)
+
+            var pluginService = new PluginService(ApiClient, Logger);
+
+            // Use our safe execution method
+            var result = ExecuteAsyncTask(() => pluginService.UninstallPluginAsync(Name));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || result == null)
             {
-                HandleException(ex);
+                return;
+            }
+
+            WriteVerbose($"Plugin uninstallation initiated: {result.Status}");
+            WriteObject($"Plugin uninstallation initiated: {result.Status}");
+
+            if (Wait.IsPresent)
+            {
+                WriteVerbose($"Waiting for plugin uninstallation to complete (timeout: {Timeout} seconds, interval: {Interval} seconds)");
+                WriteObject("Waiting for plugin uninstallation to complete...");
+
+                DateTime startTime = DateTime.Now;
+                bool completed = false;
+
+                while (DateTime.Now - startTime < TimeSpan.FromSeconds(Timeout))
+                {
+                    // Use our safe execution method
+                    var statusResult = ExecuteAsyncTask(() => pluginService.GetPluginStatusAsync());
+
+                    // Break if an exception occurred
+                    if (ProcessingException != null || statusResult == null)
+                    {
+                        break;
+                    }
+
+                    if (statusResult.Status == "done")
+                    {
+                        WriteVerbose("Plugin uninstallation completed successfully");
+                        WriteObject("Plugin uninstallation completed successfully");
+                        completed = true;
+                        break;
+                    }
+                    else if (statusResult.Status == "error")
+                    {
+                        // Store the exception to be processed in ProcessRecord
+                        ProcessingException = new Exception($"Plugin uninstallation failed: {statusResult.Log}");
+                        completed = true;
+                        break;
+                    }
+
+                    WriteVerbose($"Plugin uninstallation status: {statusResult.Status}");
+                    Thread.Sleep(Interval * 1000);
+                }
+
+                if (!completed && ProcessingException == null)
+                {
+                    WriteWarning($"Timed out waiting for plugin uninstallation to complete after {Timeout} seconds");
+                }
             }
         }
     }

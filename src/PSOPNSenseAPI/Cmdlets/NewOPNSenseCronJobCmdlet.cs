@@ -82,44 +82,49 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var cronService = new CronService(ApiClient, Logger);
+
+            var job = new CronJobConfig
             {
-                var cronService = new CronService(ApiClient, Logger);
+                Description = Description,
+                Command = Command,
+                Minutes = Minutes,
+                Hours = Hours,
+                Days = Days,
+                Months = Months,
+                Weekdays = Weekdays,
+                Enabled = Enabled.IsPresent ? "1" : "0"
+            };
 
-                var job = new CronJobConfig
+            // Use our safe execution method
+            var createResult = ExecuteAsyncTask(() => cronService.CreateJobAsync(job));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || createResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Created cron job with UUID {createResult.Uuid}");
+
+            // Apply the changes if requested
+            if (Apply.IsPresent)
+            {
+                // Use our safe execution method
+                var applyResult = ExecuteAsyncTask(() => cronService.ApplyChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
                 {
-                    Description = Description,
-                    Command = Command,
-                    Minutes = Minutes,
-                    Hours = Hours,
-                    Days = Days,
-                    Months = Months,
-                    Weekdays = Weekdays,
-                    Enabled = Enabled.IsPresent ? "1" : "0"
-                };
-
-                var createTask = Task.Run(async () => await cronService.CreateJobAsync(job));
-                var createResult = createTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Created cron job with UUID {createResult.Uuid}");
-
-                // Apply the changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await cronService.ApplyChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-                    
-                    WriteVerbose($"Cron changes applied: {applyResult.Status}");
+                    return;
                 }
 
-                WriteObject(createResult.Uuid);
+                WriteVerbose($"Cron changes applied: {applyResult.Status}");
             }
-            catch (Exception ex)
-            {
-                HandleException(ex);
-            }
+
+            WriteObject(createResult.Uuid);
         }
     }
 }

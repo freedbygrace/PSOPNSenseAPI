@@ -1,5 +1,6 @@
 using System;
 using System.Management.Automation;
+using PSOPNSenseAPI.Logging;
 using PSOPNSenseAPI.Models;
 
 namespace PSOPNSenseAPI.Cmdlets
@@ -15,35 +16,32 @@ namespace PSOPNSenseAPI.Cmdlets
     /// </summary>
     [Cmdlet(VerbsCommon.Get, "OPNSenseConnection")]
     [OutputType(typeof(PSObject))]
-    public class GetOPNSenseConnectionCmdlet : PSCmdlet
+    public class GetOPNSenseConnectionCmdlet : OPNSenseBaseCmdlet
     {
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void BeginProcessing()
         {
-            try
-            {
-                if (!OPNSenseSession.IsConnected)
-                {
-                    WriteWarning("Not connected to any OPNSense firewall.");
-                    return;
-                }
+            // Override the base implementation to avoid checking for connection
+            // since this cmdlet is used to check the connection status
+            base.BeginProcessing();
+            Logger = new PowerShellLogger(this);
+        }
 
-                var connectionInfo = new PSObject();
-                connectionInfo.Properties.Add(new PSNoteProperty("Server", OPNSenseSession.BaseUrl));
-                connectionInfo.Properties.Add(new PSNoteProperty("Connected", OPNSenseSession.IsConnected));
-
-                WriteObject(connectionInfo);
-            }
-            catch (Exception ex)
+        protected override void ProcessRecordInternal()
+        {
+            if (!OPNSenseSession.IsConnected)
             {
-                WriteError(new ErrorRecord(
-                    ex,
-                    "GetConnectionFailed",
-                    ErrorCategory.ConnectionError,
-                    null));
+                WriteWarning("Not connected to any OPNSense firewall.");
+                return;
             }
+
+            var connectionInfo = new PSObject();
+            connectionInfo.Properties.Add(new PSNoteProperty("Server", OPNSenseSession.BaseUrl));
+            connectionInfo.Properties.Add(new PSNoteProperty("Connected", OPNSenseSession.IsConnected));
+
+            WriteObject(connectionInfo);
         }
     }
 }

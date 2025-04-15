@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Management.Automation;
 using System.Net;
+using PSOPNSenseAPI.Logging;
 using PSOPNSenseAPI.Utilities;
 
 namespace PSOPNSenseAPI.Cmdlets
@@ -27,7 +28,7 @@ namespace PSOPNSenseAPI.Cmdlets
     /// </summary>
     [Cmdlet(VerbsLifecycle.Invoke, "OPNSenseNetworkCalculation")]
     [OutputType(typeof(PSObject), typeof(bool), typeof(IPNetwork2[]))]
-    public class InvokeOPNSenseNetworkCalculationCmdlet : PSCmdlet
+    public class InvokeOPNSenseNetworkCalculationCmdlet : OPNSenseBaseCmdlet
     {
         /// <summary>
         /// <para type="description">The network in CIDR notation to perform calculations on.</para>
@@ -72,111 +73,93 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void BeginProcessing()
         {
+            // Override the base implementation to avoid checking for connection
+            // since this cmdlet doesn't require a connection
+            base.BeginProcessing();
+            Logger = new PowerShellLogger(this);
+        }
+
+        protected override void ProcessRecordInternal()
+        {
+            // Parse the network
+            IPNetwork2 network;
             try
             {
-                // Parse the network
-                IPNetwork2 network = NetworkUtility.ParseCIDR(Network);
-
-                switch (Operation)
-                {
-                    case "Info":
-                        WriteNetworkInfo(network);
-                        break;
-
-                    case "Subnet":
-                        if (!PrefixLength.HasValue)
-                        {
-                            WriteError(new ErrorRecord(
-                                new ArgumentException("PrefixLength is required for Subnet operations."),
-                                "MissingPrefixLength",
-                                ErrorCategory.InvalidArgument,
-                                null));
-                            return;
-                        }
-
-                        WriteSubnets(network, PrefixLength.Value);
-                        break;
-
-                    case "SubnetByCount":
-                        if (!SubnetCount.HasValue)
-                        {
-                            WriteError(new ErrorRecord(
-                                new ArgumentException("SubnetCount is required for SubnetByCount operations."),
-                                "MissingSubnetCount",
-                                ErrorCategory.InvalidArgument,
-                                null));
-                            return;
-                        }
-
-                        WriteSubnetsByCount(network, SubnetCount.Value);
-                        break;
-
-                    case "Contains":
-                        if (string.IsNullOrEmpty(IPAddress))
-                        {
-                            WriteError(new ErrorRecord(
-                                new ArgumentException("IPAddress is required for Contains operations."),
-                                "MissingIPAddress",
-                                ErrorCategory.InvalidArgument,
-                                null));
-                            return;
-                        }
-
-                        WriteContains(network, IPAddress);
-                        break;
-
-                    case "Overlaps":
-                        if (AdditionalNetworks == null || AdditionalNetworks.Length == 0)
-                        {
-                            WriteError(new ErrorRecord(
-                                new ArgumentException("AdditionalNetworks is required for Overlaps operations."),
-                                "MissingAdditionalNetworks",
-                                ErrorCategory.InvalidArgument,
-                                null));
-                            return;
-                        }
-
-                        WriteOverlaps(network, AdditionalNetworks);
-                        break;
-
-                    case "Supernet":
-                        if (AdditionalNetworks == null || AdditionalNetworks.Length == 0)
-                        {
-                            WriteError(new ErrorRecord(
-                                new ArgumentException("AdditionalNetworks is required for Supernet operations."),
-                                "MissingAdditionalNetworks",
-                                ErrorCategory.InvalidArgument,
-                                null));
-                            return;
-                        }
-
-                        WriteSupernet(network, AdditionalNetworks);
-                        break;
-
-                    case "SupernetSummarize":
-                        if (AdditionalNetworks == null || AdditionalNetworks.Length == 0)
-                        {
-                            WriteError(new ErrorRecord(
-                                new ArgumentException("AdditionalNetworks is required for SupernetSummarize operations."),
-                                "MissingAdditionalNetworks",
-                                ErrorCategory.InvalidArgument,
-                                null));
-                            return;
-                        }
-
-                        WriteSupernetSummarize(network, AdditionalNetworks);
-                        break;
-                }
+                network = NetworkUtility.ParseCIDR(Network);
             }
             catch (Exception ex)
             {
-                WriteError(new ErrorRecord(
-                    ex,
-                    "NetworkCalculationError",
-                    ErrorCategory.InvalidOperation,
-                    null));
+                ProcessingException = new ArgumentException($"Invalid network format: {Network}", ex);
+                return;
+            }
+
+            switch (Operation)
+            {
+                case "Info":
+                    WriteNetworkInfo(network);
+                    break;
+
+                case "Subnet":
+                    if (!PrefixLength.HasValue)
+                    {
+                        ProcessingException = new ArgumentException("PrefixLength is required for Subnet operations.");
+                        return;
+                    }
+
+                    WriteSubnets(network, PrefixLength.Value);
+                    break;
+
+                case "SubnetByCount":
+                    if (!SubnetCount.HasValue)
+                    {
+                        ProcessingException = new ArgumentException("SubnetCount is required for SubnetByCount operations.");
+                        return;
+                    }
+
+                    WriteSubnetsByCount(network, SubnetCount.Value);
+                    break;
+
+                case "Contains":
+                    if (string.IsNullOrEmpty(IPAddress))
+                    {
+                        ProcessingException = new ArgumentException("IPAddress is required for Contains operations.");
+                        return;
+                    }
+
+                    WriteContains(network, IPAddress);
+                    break;
+
+                case "Overlaps":
+                    if (AdditionalNetworks == null || AdditionalNetworks.Length == 0)
+                    {
+                        ProcessingException = new ArgumentException("AdditionalNetworks is required for Overlaps operations.");
+                        return;
+                    }
+
+                    WriteOverlaps(network, AdditionalNetworks);
+                    break;
+
+                case "Supernet":
+                    if (AdditionalNetworks == null || AdditionalNetworks.Length == 0)
+                    {
+                        ProcessingException = new ArgumentException("AdditionalNetworks is required for Supernet operations.");
+                        return;
+                    }
+
+                    WriteSupernet(network, AdditionalNetworks);
+                    break;
+
+                case "SupernetSummarize":
+                    if (AdditionalNetworks == null || AdditionalNetworks.Length == 0)
+                    {
+                        ProcessingException = new ArgumentException("AdditionalNetworks is required for SupernetSummarize operations.");
+                        return;
+                    }
+
+                    WriteSupernetSummarize(network, AdditionalNetworks);
+                    break;
             }
         }
 
