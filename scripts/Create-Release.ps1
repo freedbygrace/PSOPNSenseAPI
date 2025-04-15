@@ -52,9 +52,22 @@ foreach (`$dll in `$dllFiles) {
     }
 }
 
-# Export all cmdlets from the PSD1 file
+# PowerShell will automatically export the cmdlets based on the [Cmdlet] attribute
 "@
 Set-Content -Path $psm1Path -Value $psm1Content
+
+# Test the module import
+Write-Host "Testing module import..."
+try {
+    Import-Module "$PSScriptRoot\..\output\PSOPNSenseAPI\PSOPNSenseAPI.psd1" -Force -Verbose
+    $cmdlets = Get-Command -Module PSOPNSenseAPI
+    Write-Host "Successfully imported module with $($cmdlets.Count) cmdlets"
+    Remove-Module PSOPNSenseAPI -Force -ErrorAction SilentlyContinue
+}
+catch {
+    Write-Error "Failed to import module: $_"
+    exit 1
+}
 
 # Create a release archive
 $zipFile = "output\PSOPNSenseAPI-$version.zip"
