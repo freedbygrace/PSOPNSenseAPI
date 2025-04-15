@@ -33,28 +33,35 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
-            {
-                var interfaceService = new InterfaceService(ApiClient, Logger);
+            var interfaceService = new InterfaceService(ApiClient, Logger);
 
-                if (ParameterSetName == "ByName")
-                {
-                    var task = Task.Run(async () => await interfaceService.GetInterfaceDetailAsync(Name));
-                    var result = task.GetAwaiter().GetResult();
-                    WriteObject(result.Interface);
-                }
-                else
-                {
-                    var task = Task.Run(async () => await interfaceService.GetInterfacesAsync());
-                    var result = task.GetAwaiter().GetResult();
-                    WriteObject(result.Interfaces, true);
-                }
-            }
-            catch (Exception ex)
+            if (ParameterSetName == "ByName")
             {
-                HandleException(ex);
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => interfaceService.GetInterfaceDetailAsync(Name));
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
+                {
+                    return;
+                }
+
+                WriteObject(result.Interface);
+            }
+            else
+            {
+                // Use our safe execution method
+                var result = ExecuteAsyncTask(() => interfaceService.GetInterfacesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || result == null)
+                {
+                    return;
+                }
+
+                WriteObject(result.Interfaces, true);
             }
         }
     }

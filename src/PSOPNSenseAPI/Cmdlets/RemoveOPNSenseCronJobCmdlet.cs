@@ -45,44 +45,56 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var cronService = new CronService(ApiClient, Logger);
+
+            // Get the job details for the confirmation message
+            var jobResult = ExecuteAsyncTask(() => cronService.GetJobAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || jobResult == null)
             {
-                var cronService = new CronService(ApiClient, Logger);
+                return;
+            }
 
-                // Get the job details for the confirmation message
-                var getTask = Task.Run(async () => await cronService.GetJobAsync(Uuid));
-                var job = getTask.GetAwaiter().GetResult().Job;
+            var job = jobResult.Job;
 
-                string confirmMessage = $"Cron job: {job.Description}";
-                if (!string.IsNullOrEmpty(job.Command))
-                {
-                    confirmMessage += $" ({job.Command})";
-                }
+            string confirmMessage = $"Cron job: {job.Description}";
+            if (!string.IsNullOrEmpty(job.Command))
+            {
+                confirmMessage += $" ({job.Command})";
+            }
 
-                if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            if (!Force.IsPresent && !ShouldProcess(confirmMessage, "Remove"))
+            {
+                return;
+            }
+
+            // Use our safe execution method
+            var deleteResult = ExecuteAsyncTask(() => cronService.DeleteJobAsync(Uuid));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || deleteResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Cron job {Uuid} removed: {deleteResult.Result}");
+
+            // Apply the changes if requested
+            if (Apply.IsPresent)
+            {
+                // Use our safe execution method
+                var applyResult = ExecuteAsyncTask(() => cronService.ApplyChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
                 {
                     return;
                 }
 
-                var deleteTask = Task.Run(async () => await cronService.DeleteJobAsync(Uuid));
-                var deleteResult = deleteTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Cron job {Uuid} removed: {deleteResult.Result}");
-
-                // Apply the changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await cronService.ApplyChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-                    
-                    WriteVerbose($"Cron changes applied: {applyResult.Status}");
-                }
-            }
-            catch (Exception ex)
-            {
-                HandleException(ex);
+                WriteVerbose($"Cron changes applied: {applyResult.Status}");
             }
         }
     }

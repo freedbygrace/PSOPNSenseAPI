@@ -27,61 +27,74 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var tailscaleService = new TailscaleService(ApiClient, Logger);
+
+            // Check if the plugin is installed
+            var isInstalled = ExecuteAsyncTask(() => tailscaleService.IsPluginInstalledAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null)
             {
-                var tailscaleService = new TailscaleService(ApiClient, Logger);
-
-                // Check if the plugin is installed
-                var isInstalledTask = Task.Run(async () => await tailscaleService.IsPluginInstalledAsync());
-                var isInstalled = isInstalledTask.GetAwaiter().GetResult();
-
-                if (!isInstalled)
-                {
-                    WriteWarning("Tailscale plugin is not installed on the OPNSense firewall.");
-                    return;
-                }
-
-                // Get current status
-                var statusTask = Task.Run(async () => await tailscaleService.GetStatusAsync());
-                var status = statusTask.GetAwaiter().GetResult();
-
-                if (!status.Running)
-                {
-                    WriteWarning("Tailscale service is not running.");
-                    return;
-                }
-
-                if (!Force.IsPresent && !ShouldProcess("OPNSense firewall", "Disconnect from Tailscale network"))
-                {
-                    return;
-                }
-
-                // Disconnect from Tailscale
-                WriteVerbose("Disconnecting from Tailscale network...");
-                var disconnectTask = Task.Run(async () => await tailscaleService.DisconnectAsync());
-                var disconnectResult = disconnectTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Tailscale disconnection status: {disconnectResult.Status}");
-
-                // Get updated status
-                statusTask = Task.Run(async () => await tailscaleService.GetStatusAsync());
-                status = statusTask.GetAwaiter().GetResult();
-
-                // Create result object
-                var result = new PSObject();
-                result.Properties.Add(new PSNoteProperty("Status", status.Status));
-                result.Properties.Add(new PSNoteProperty("Running", status.Running));
-                result.Properties.Add(new PSNoteProperty("Enabled", status.Enabled));
-                result.Properties.Add(new PSNoteProperty("DisconnectionStatus", disconnectResult.Status));
-
-                WriteObject(result);
+                return;
             }
-            catch (Exception ex)
+
+            if (!isInstalled)
             {
-                HandleException(ex);
+                WriteWarning("Tailscale plugin is not installed on the OPNSense firewall.");
+                return;
             }
+
+            // Get current status
+            var status = ExecuteAsyncTask(() => tailscaleService.GetStatusAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || status == null)
+            {
+                return;
+            }
+
+            if (!status.Running)
+            {
+                WriteWarning("Tailscale service is not running.");
+                return;
+            }
+
+            if (!Force.IsPresent && !ShouldProcess("OPNSense firewall", "Disconnect from Tailscale network"))
+            {
+                return;
+            }
+
+            // Disconnect from Tailscale
+            WriteVerbose("Disconnecting from Tailscale network...");
+            var disconnectResult = ExecuteAsyncTask(() => tailscaleService.DisconnectAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || disconnectResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Tailscale disconnection status: {disconnectResult.Status}");
+
+            // Get updated status
+            status = ExecuteAsyncTask(() => tailscaleService.GetStatusAsync());
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || status == null)
+            {
+                return;
+            }
+
+            // Create result object
+            var result = new PSObject();
+            result.Properties.Add(new PSNoteProperty("Status", status.Status));
+            result.Properties.Add(new PSNoteProperty("Running", status.Running));
+            result.Properties.Add(new PSNoteProperty("Enabled", status.Enabled));
+            result.Properties.Add(new PSNoteProperty("DisconnectionStatus", disconnectResult.Status));
+
+            WriteObject(result);
         }
     }
 }

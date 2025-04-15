@@ -53,40 +53,45 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void ProcessRecord()
+        protected override void ProcessRecordInternal()
         {
-            try
+            var routeService = new RouteService(ApiClient, Logger);
+
+            var route = new RouteConfig
             {
-                var routeService = new RouteService(ApiClient, Logger);
+                Network = Network,
+                Gateway = Gateway,
+                Description = Description,
+                Disabled = Disabled.IsPresent ? "1" : "0"
+            };
 
-                var route = new RouteConfig
+            // Use our safe execution method
+            var createResult = ExecuteAsyncTask(() => routeService.CreateRouteAsync(route));
+
+            // Only continue if no exception occurred
+            if (ProcessingException != null || createResult == null)
+            {
+                return;
+            }
+
+            WriteVerbose($"Created route with UUID {createResult.Uuid}");
+
+            // Apply changes if requested
+            if (Apply.IsPresent)
+            {
+                // Use our safe execution method
+                var applyResult = ExecuteAsyncTask(() => routeService.ApplyRouteChangesAsync());
+
+                // Only continue if no exception occurred
+                if (ProcessingException != null || applyResult == null)
                 {
-                    Network = Network,
-                    Gateway = Gateway,
-                    Description = Description,
-                    Disabled = Disabled.IsPresent ? "1" : "0"
-                };
-
-                var createTask = Task.Run(async () => await routeService.CreateRouteAsync(route));
-                var createResult = createTask.GetAwaiter().GetResult();
-
-                WriteVerbose($"Created route with UUID {createResult.Uuid}");
-
-                // Apply changes if requested
-                if (Apply.IsPresent)
-                {
-                    var applyTask = Task.Run(async () => await routeService.ApplyRouteChangesAsync());
-                    var applyResult = applyTask.GetAwaiter().GetResult();
-
-                    WriteVerbose($"Route changes applied: {applyResult.Status}");
+                    return;
                 }
 
-                WriteObject(createResult.Uuid);
+                WriteVerbose($"Route changes applied: {applyResult.Status}");
             }
-            catch (Exception ex)
-            {
-                HandleException(ex);
-            }
+
+            WriteObject(createResult.Uuid);
         }
     }
 }
