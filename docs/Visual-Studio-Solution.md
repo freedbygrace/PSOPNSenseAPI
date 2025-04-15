@@ -11,6 +11,7 @@ The PSOPNSenseAPI solution is a Visual Studio solution that contains the source 
 The solution contains the following projects:
 
 - **PSOPNSenseAPI**: The main project containing the PowerShell module code.
+- **PSOPNSenseAPI.Tests**: The test project containing unit tests for the PowerShell module.
 
 ## Opening the Solution
 
@@ -56,19 +57,19 @@ If you encounter issues with the IPNetwork2 library, here are some common troubl
 
 1. **Check the reference**: Ensure that the IPNetwork2 package is properly referenced in the project file.
    ```xml
-   <PackageReference Include="IPNetwork2" Version="2.6.618" />
+   <PackageReference Include="IPNetwork2" Version="3.1.764" />
    ```
 
-2. **Verify the namespace**: The correct namespace for IPNetwork2 is `System.Net.IPNetwork`.
+2. **Verify the namespace**: The correct namespace for IPNetwork2 is `System.Net`.
    ```csharp
-   using System.Net.IPNetwork;
+   using System.Net;
    ```
 
 3. **Check the class name**: The main class in IPNetwork2 is `IPNetwork`, not `IPNetwork2`.
    ```csharp
    // Correct usage
-   System.Net.IPNetwork.IPNetwork network = System.Net.IPNetwork.IPNetwork.Parse("192.168.1.0/24");
-   
+   System.Net.IPNetwork network = System.Net.IPNetwork.Parse("192.168.1.0/24");
+
    // Incorrect usage
    IPNetwork2 network = IPNetwork2.Parse("192.168.1.0/24");
    ```
@@ -100,7 +101,7 @@ When adding new features to the solution:
 2. Implement service classes in the `Services` directory
 3. Create PowerShell cmdlets in the `Cmdlets` directory
 4. Update the module manifest (`PSOPNSenseAPI.psd1`) to export the new cmdlets
-5. Add tests for the new features
+5. Add tests for the new features in the `PSOPNSenseAPI.Tests` project
 6. Update documentation
 
 ## Testing
@@ -112,9 +113,14 @@ The solution includes unit tests that can be run from Visual Studio using the Te
 .\build\test.ps1
 ```
 
-## Continuous Integration
+## Manual Release Process
 
-The project uses GitHub Actions for continuous integration. The CI workflow builds and tests the solution on every push to the main branch.
+The project uses a manual release process. To create a new release:
+
+1. Update the version in the project file and module manifest
+2. Build the solution in Release mode
+3. Create a zip file of the module
+4. Create a GitHub release with the zip file attached
 
 ## Dependencies
 
@@ -123,10 +129,29 @@ The solution has the following dependencies:
 - PowerShellStandard.Library (5.1.1)
 - Newtonsoft.Json (13.0.3)
 - System.Net.Http (4.3.4)
-- IPNetwork2 (2.6.618)
+- IPNetwork2 (3.1.764)
 
 ## Notes
 
 - The solution is configured to target both .NET Framework 4.7.2 and .NET Standard 2.0 to support both Windows PowerShell 5.1 and PowerShell 7+.
-- The module uses a versioning scheme of `yyyy.MM.dd.HHmm` for releases, which is automatically generated during the build process.
+- The module uses a versioning scheme of `yyyy.MM.dd.HHmm` for releases.
 - The solution includes XML documentation comments that are used to generate help content for the PowerShell cmdlets.
+- The module uses System.Reflection.Assembly::LoadBytes to load DLLs to avoid file lock issues.
+- DLLs are organized in a lib subfolder for neatness.
+
+## Module Structure
+
+The module has the following structure:
+
+```
+PSOPNSenseAPI/
+├── lib/                  # DLL files
+│   ├── Newtonsoft.Json.dll
+│   ├── PSOPNSenseAPI.dll
+│   ├── System.Net.IPNetwork.dll
+│   └── ...
+├── PSOPNSenseAPI.psd1    # Module manifest
+└── PSOPNSenseAPI.psm1    # Module script that loads DLLs
+```
+
+The PSM1 file uses System.Reflection.Assembly::LoadBytes to load the DLLs from the lib folder, which avoids file lock issues that can occur when PowerShell loads DLLs directly.
