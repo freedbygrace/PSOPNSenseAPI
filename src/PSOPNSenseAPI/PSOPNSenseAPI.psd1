@@ -154,7 +154,7 @@
         'Set-OPNSenseVLAN',
         'Uninstall-OPNSensePlugin',
         'Update-OPNSenseFirmware',
-        'Upgrade-OPNSenseFirmware'
+        'Start-OPNSenseFirmwareUpgrade'
     )
 
     # Variables to export from this module

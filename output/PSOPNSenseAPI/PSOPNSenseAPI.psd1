@@ -102,10 +102,12 @@
         'Set-OPNSenseVLAN',
         'Uninstall-OPNSensePlugin',
         'Update-OPNSenseFirmware',
-        'Upgrade-OPNSenseFirmware'
+        'Start-OPNSenseFirmwareUpgrade'
     )
     VariablesToExport = @()
     AliasesToExport = @()
+    RequiredAssemblies = @('lib\System.Net.IPNetwork.dll', 'lib\Newtonsoft.Json.dll')
+    NestedModules = @('lib\PSOPNSenseAPI.dll')
     PrivateData = @{
         PSData = @{
             Tags = @('PowerShell', 'OPNSense', 'Firewall', 'API')

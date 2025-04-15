@@ -1,5 +1,6 @@
 using System;
 using System.Management.Automation;
+using System.Management.Automation.Runspaces;
 using System.Threading;
 using System.Threading.Tasks;
 using PSOPNSenseAPI.Services;
@@ -20,7 +21,7 @@ namespace PSOPNSenseAPI.Cmdlets
     ///     <para>This example upgrades the firmware on the OPNSense firewall and waits for the upgrade to complete.</para>
     /// </example>
     /// </summary>
-    [Cmdlet(VerbsData.Update, "OPNSenseFirmware", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
+    [Cmdlet(VerbsLifecycle.Start, "OPNSenseFirmwareUpgrade", SupportsShouldProcess = true, ConfirmImpact = ConfirmImpact.High)]
     [OutputType(typeof(void))]
     public class UpgradeOPNSenseFirmwareCmdlet : OPNSenseBaseCmdlet
     {
