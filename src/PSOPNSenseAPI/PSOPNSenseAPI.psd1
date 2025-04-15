@@ -1,9 +1,9 @@
 @{
     # Script module or binary module file associated with this manifest.
-    RootModule = 'PSOPNSenseAPI.dll'
+    RootModule = 'PSOPNSenseAPI.psm1'
 
     # Version number of this module.
-    ModuleVersion = '0.5.0'
+    ModuleVersion = '2025.04.14.2306'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Desktop', 'Core')
@@ -45,7 +45,7 @@
     # RequiredModules = @()
 
     # Assemblies that must be loaded prior to importing this module
-    RequiredAssemblies = @('System.Net.Http', 'Newtonsoft.Json', 'System.Net.IPNetwork')
+    # RequiredAssemblies = @()
 
     # Script files (.ps1) that are run in the caller's environment prior to importing this module.
     # ScriptsToProcess = @()

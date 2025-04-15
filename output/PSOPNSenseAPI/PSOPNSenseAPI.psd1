@@ -1,6 +1,6 @@
 @{
     RootModule = 'PSOPNSenseAPI.psm1'
-    ModuleVersion = '2025.04.14.2253'
+    ModuleVersion = '2025.04.14.2306'
     GUID = '1f0e4b77-cc7c-4a1e-b45a-d7c51a3c562e'
     Author = 'PSOPNSenseAPI Contributors'
     CompanyName = 'PSOPNSenseAPI'
