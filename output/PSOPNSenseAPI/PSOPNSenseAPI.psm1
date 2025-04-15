@@ -1,36 +1,13 @@
-# Load assemblies from the lib folder using System.Reflection.Assembly::LoadBytes
-# This avoids file lock issues when the module is loaded
+# Load the main assembly directly
+$mainDllPath = Join-Path $PSScriptRoot "lib\PSOPNSenseAPI.dll"
 
-$libPath = Join-Path $PSScriptRoot -ChildPath "lib"
+Write-Verbose "Loading assembly from $mainDllPath"
 
-$DLLFileList = Get-ChildItem -Path $libPath -Filter "*.dll"
-
-$DLLFileListCount = ($DLLFileList | Measure-Object).Count
-
-$DLLFileListCounter = 1
-
-For ($DLLFileListIndex = 0; $DLLFileListIndex -lt $DLLFileListCount; $DLLFileListIndex++)
-  {
-      Try
-        {
-            $DLLFile = $DLLFileList[$DLLFileListIndex]
-
-            Write-Verbose "Attempting to load DLL assembly $($DLLFileListCounter) of $($DLLFileListCount). Please Wait..."
-
-            Write-Verbose "Path: $($DLLFile)"
-
-            $DLLFileBytes = [System.IO.File]::ReadAllBytes($DLLFile.FullName)
-
-            $Null = [System.Reflection.Assembly]::Load($DLLFileBytes)
-
-            Write-Verbose "Successfully loaded DLL assembly $($DLLFileListCounter) of $($DLLFileListCount)"
-        }
-      Catch
-        {
-            Write-Warning "Failed to load DLL assembly $($DLLFileListCounter) of $($DLLFileListCount): $($_.Exception.Message)"
-        }
-      Finally
-        {
-            $DLLFileListCounter++
-        }
+try {
+    Add-Type -Path $mainDllPath
+    Write-Verbose "Successfully loaded assembly from $mainDllPath"
+} catch {
+    $errorMessage = $_.Exception.Message
+    Write-Error "Failed to load assembly from $($mainDllPath): $($errorMessage)"
+    throw
 }
