@@ -62,8 +62,8 @@ namespace PSOPNSenseAPI.Cmdlets
                 // Read the configuration file
                 var configContent = File.ReadAllBytes(fullPath);
 
-                var task = Task.Run(async () => await configService.ImportConfigAsync(configContent));
-                var result = task.GetAwaiter().GetResult();
+                // Execute the async method synchronously on the main thread
+                var result = configService.ImportConfigAsync(configContent).GetAwaiter().GetResult();
 
                 WriteVerbose($"Imported configuration from {fullPath}: {result.Status}");
                 WriteWarning("The firewall is restarting. You may need to reconnect after it comes back online.");

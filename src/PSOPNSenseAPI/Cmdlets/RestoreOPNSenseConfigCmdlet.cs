@@ -68,10 +68,8 @@ namespace PSOPNSenseAPI.Cmdlets
 
                 if (ParameterSetName == "Filename")
                 {
-                    // Restore from backup file
-                    var task = Task.Run(async () => await configService.RestoreConfigBackupAsync(Filename));
-                    var result = task.GetAwaiter().GetResult();
-
+                    // Restore from backup file - execute synchronously on the main thread
+                    var result = configService.RestoreConfigBackupAsync(Filename).GetAwaiter().GetResult();
                     WriteVerbose($"Restored configuration from backup: {result.Status}");
                 }
                 else
@@ -84,9 +82,8 @@ namespace PSOPNSenseAPI.Cmdlets
                         configContent = memoryStream.ToArray();
                     }
 
-                    var task = Task.Run(async () => await configService.ImportConfigAsync(configContent));
-                    var result = task.GetAwaiter().GetResult();
-
+                    // Execute synchronously on the main thread
+                    var result = configService.ImportConfigAsync(configContent).GetAwaiter().GetResult();
                     WriteVerbose($"Restored configuration from XML document: {result.Status}");
                 }
 

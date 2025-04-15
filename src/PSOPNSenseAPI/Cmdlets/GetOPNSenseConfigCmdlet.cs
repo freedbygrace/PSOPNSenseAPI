@@ -34,8 +34,8 @@ namespace PSOPNSenseAPI.Cmdlets
             {
                 var configService = new ConfigService(ApiClient, Logger);
 
-                var task = Task.Run(async () => await configService.ExportConfigAsync());
-                var configContent = task.GetAwaiter().GetResult();
+                // Execute the async method synchronously on the main thread
+                var configContent = configService.ExportConfigAsync().GetAwaiter().GetResult();
 
                 // Convert the byte array to an XML document
                 var xmlDoc = new XmlDocument();

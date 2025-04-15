@@ -54,8 +54,8 @@ namespace PSOPNSenseAPI.Cmdlets
 
                 var configService = new ConfigService(ApiClient, Logger);
 
-                var task = Task.Run(async () => await configService.ExportConfigAsync());
-                var configContent = task.GetAwaiter().GetResult();
+                // Execute the async method synchronously on the main thread
+                var configContent = configService.ExportConfigAsync().GetAwaiter().GetResult();
 
                 // Create the directory if it doesn't exist
                 var directory = System.IO.Path.GetDirectoryName(fullPath);

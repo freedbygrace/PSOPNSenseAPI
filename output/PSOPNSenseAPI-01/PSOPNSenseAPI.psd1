@@ -1,6 +1,6 @@
 @{
     # Script module or binary module file associated with this manifest.
-    RootModule = 'lib\PSOPNSenseAPI.dll'
+    RootModule = 'PSOPNSenseAPI.psm1'
 
     # Version number of this module.
     ModuleVersion = '2025.04.15.1143'
@@ -57,7 +57,7 @@
     # FormatsToProcess = @()
 
     # Modules to import as nested modules of the module specified in RootModule/ModuleToProcess
-    # NestedModules = @()
+    NestedModules = @('lib\PSOPNSenseAPI.dll')
 
     # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
     FunctionsToExport = @()

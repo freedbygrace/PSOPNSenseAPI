@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated `Restore-OPNSenseConfig` to accept an XML document from the pipeline or as a parameter
 - Changed `Export-OPNSenseConfig` and `Import-OPNSenseConfig` to use System.IO.FileInfo for the Path parameter
 - Added unit tests for firmware management cmdlets
+- Fixed threading issue in cmdlets that was causing "WriteObject and WriteError methods cannot be called from outside the overrides" error
+- Changed module structure to use DLL as root module instead of nested module
 
 ### Removed
 - Removed `Backup-OPNSenseConfig` cmdlet (use `Get-OPNSenseConfig` instead)
