@@ -1,0 +1,126 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.github/**'
+      - '!.github/workflows/build-and-release.yml'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Create a release'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '6.0.x'
+    
+    - name: Setup PowerShell
+      uses: actions/setup-powershell@v1
+      with:
+        powershell-version: '7.2'
+    
+    - name: Restore dependencies
+      run: dotnet restore src/PSOPNSenseAPI.sln
+    
+    - name: Run tests
+      run: pwsh -Command "./build/test.ps1 -Configuration Release"
+    
+    - name: Build and package
+      run: |
+        pwsh -Command "./build/build-release.ps1 -Clean -Package"
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: PSOPNSenseAPI
+        path: output/PSOPNSenseAPI/
+    
+    - name: Upload package artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: PSOPNSenseAPI-Package
+        path: packages/*.zip
+    
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event.inputs.release == 'true'
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - name: Setup PowerShell
+      uses: actions/setup-powershell@v1
+      with:
+        powershell-version: '7.2'
+    
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: PSOPNSenseAPI
+        path: output/PSOPNSenseAPI/
+    
+    - name: Download package artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: PSOPNSenseAPI-Package
+        path: packages/
+    
+    - name: Configure Git
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+    
+    - name: Create Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        $version = Get-Date -Format "yyyy.MM.dd.HHmm"
+        
+        # Update version in project file
+        $projectFile = "src/PSOPNSenseAPI/PSOPNSenseAPI.csproj"
+        $projectXml = [xml](Get-Content $projectFile)
+        $versionNode = $projectXml.Project.PropertyGroup.Version
+        $versionNode.InnerText = $version
+        $projectXml.Save($projectFile)
+        
+        # Update version in module manifest
+        $manifestFile = "PSOPNSenseAPI/PSOPNSenseAPI.psd1"
+        $manifestContent = Get-Content -Path $manifestFile -Raw
+        $manifestContent = $manifestContent -replace "ModuleVersion\s*=\s*['`"].*['`"]", "ModuleVersion = '$version'"
+        Set-Content -Path $manifestFile -Value $manifestContent
+        
+        # Commit changes
+        git add $projectFile
+        git add $manifestFile
+        git commit -m "Release version $version [skip ci]"
+        git push
+        
+        # Create release
+        $packagePath = Get-ChildItem -Path "packages/*.zip" | Select-Object -First 1 -ExpandProperty FullName
+        
+        gh release create "v$version" `
+          --title "Release v$version" `
+          --notes "Release version $version - $(Get-Date -Format 'yyyy-MM-dd')" `
+          $packagePath
+      shell: pwsh

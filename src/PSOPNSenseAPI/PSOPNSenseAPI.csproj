@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net472</TargetFrameworks>
+    <AssemblyName>PSOPNSenseAPI</AssemblyName>
+    <RootNamespace>PSOPNSenseAPI</RootNamespace>
+    <Version>2025.04.14.2246</Version>
+    <Authors>PSOPNSenseAPI Contributors</Authors>
+    <Company>PSOPNSenseAPI</Company>
+    <Description>PowerShell module for interacting with the OPNSense API to configure firewalls</Description>
+    <Copyright>Copyright (c) 2025 PSOPNSenseAPI Contributors</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/freedbygrace/PSOPNSenseAPI</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/freedbygrace/PSOPNSenseAPI</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>PowerShell;OPNSense;Firewall;API</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PowerShellStandard.Library" Version="5.1.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="System.Net.Http" Version="4.3.4" />
+    <PackageReference Include="IPNetwork2" Version="3.1.764" />
+  </ItemGroup>
+
+</Project>
+
+
+
+
+
+
+
+
+
+
+
+
+

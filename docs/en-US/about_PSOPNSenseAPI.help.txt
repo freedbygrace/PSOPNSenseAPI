@@ -1,0 +1,135 @@
+TOPIC
+    about_PSOPNSenseAPI
+
+SHORT DESCRIPTION
+    PowerShell module for interacting with the OPNSense API to configure firewalls.
+
+LONG DESCRIPTION
+    The PSOPNSenseAPI module provides cmdlets for managing OPNSense firewalls through their API.
+    It allows you to perform various firewall management tasks such as:
+
+    - Managing firewall rules (create, read, update, delete)
+    - Configuring NAT rules and port forwarding
+    - Managing aliases and address groups
+    - Managing network interfaces and VLANs
+    - Configuring DNS settings and overrides
+    - Backing up, restoring, exporting, and importing configurations
+    - Managing plugins (install, uninstall, enable, disable)
+    - Managing users and permissions
+    - Updating and upgrading firmware
+    - Rebooting firewall with wait for reconnection
+    - Creating VLANs from subnet divisions
+    - Configuring DHCP servers and static mappings
+    - Managing cron jobs
+    - Configuring and managing Tailscale VPN (with auto-installation)
+    - Applying and reverting configuration changes
+
+    The module is built as a binary module in C# and is compatible with both PowerShell 5.1 and PowerShell 7.
+
+EXAMPLES
+    Connect to an OPNSense firewall:
+
+    Connect-OPNSense -Server "https://firewall.example.com" -ApiKey "your_api_key" -ApiSecret "your_api_secret"
+
+    Get all firewall rules:
+
+    Get-OPNSenseFirewallRule
+
+    Create a new firewall rule:
+
+    New-OPNSenseFirewallRule -Description "Allow HTTP" -Protocol TCP -DestinationPort 80 -Action pass
+
+    Apply changes:
+
+    Apply-OPNSenseFirewallChanges
+
+    Manage interfaces:
+
+    Get-OPNSenseInterface
+    Set-OPNSenseInterface -Name "lan" -Description "Local Network" -IpAddress "192.168.1.1" -SubnetMask "24"
+
+    Create VLANs from subnet divisions:
+
+    New-OPNSenseSubnetVLANs -ParentInterface "em0" -Network "192.168.0.0/24" -SubnetMaskBits 27 -StartingVlanId 10 -VlanIdIncrement 10
+
+    Configure DNS:
+
+    Set-OPNSenseDNSServer -Forwarding -Forwarders "8.8.8.8","8.8.4.4" -Apply
+    New-OPNSenseDNSOverride -Hostname "server" -Domain "local" -IpAddress "192.168.1.10"
+
+    Manage plugins:
+
+    Get-OPNSensePlugin -Installed
+    Install-OPNSensePlugin -Name "os-acme-client" -Wait
+
+    Manage users:
+
+    New-OPNSenseUser -Username "john" -Password "P@ssw0rd" -FullName "John Doe" -Groups "admins"
+
+    Configure DHCP:
+
+    Get-OPNSenseDHCPServer
+    Set-OPNSenseDHCPServer -Interface "lan" -RangeFrom "192.168.1.100" -RangeTo "192.168.1.200" -Apply
+    New-OPNSenseDHCPStaticMapping -Interface "lan" -MacAddress "00:11:22:33:44:55" -IpAddress "192.168.1.50"
+
+    Manage cron jobs:
+
+    Get-OPNSenseCronJob
+    New-OPNSenseCronJob -Description "Daily backup" -Command "/usr/local/bin/backup.sh" -Minutes "0" -Hours "2" -Apply
+
+    Configure and manage Tailscale:
+
+    Get-OPNSenseTailscaleStatus -IncludeInterfaces
+    Enable-OPNSenseTailscale -AcceptDns -AcceptRoutes -Force
+    # Advertise subnet routes to Tailscale network
+    Enable-OPNSenseTailscale -AdvertiseRoutes -SubnetRoutes "192.168.1.0/24","10.0.0.0/8" -Force
+    Connect-OPNSenseTailscale -AuthKey "tskey-auth-abcdef123456" -InstallIfMissing -Force
+
+    Firmware management:
+
+    Update-OPNSenseFirmware -Wait
+
+    Reboot firewall:
+
+    Restart-OPNSenseFirewall -Wait -Timeout 300
+
+    Backup and restore configuration:
+
+    Backup-OPNSenseConfig -Filename "pre-upgrade-backup"
+    Export-OPNSenseConfig -Path "C:\Backups\opnsense-config.xml"
+
+KEYWORDS
+    OPNSense, Firewall, API, Network, Security
+
+SEE ALSO
+    Connect-OPNSense
+    Disconnect-OPNSense
+    Get-OPNSenseFirewallRule
+    New-OPNSenseFirewallRule
+    Apply-OPNSenseFirewallChanges
+    Get-OPNSenseInterface
+    Set-OPNSenseInterface
+    New-OPNSenseSubnetVLANs
+    Get-OPNSenseVLAN
+    New-OPNSenseVLAN
+    Get-OPNSenseDNSServer
+    Set-OPNSenseDNSServer
+    Get-OPNSensePlugin
+    Install-OPNSensePlugin
+    Get-OPNSenseUser
+    New-OPNSenseUser
+    Get-OPNSenseDHCPServer
+    Set-OPNSenseDHCPServer
+    Get-OPNSenseDHCPStaticMapping
+    New-OPNSenseDHCPStaticMapping
+    Get-OPNSenseCronJob
+    New-OPNSenseCronJob
+    Get-OPNSenseTailscaleStatus
+    Enable-OPNSenseTailscale
+    Connect-OPNSenseTailscale
+    Disconnect-OPNSenseTailscale
+    Get-OPNSenseFirmware
+    Update-OPNSenseFirmware
+    Restart-OPNSenseFirewall
+    Backup-OPNSenseConfig
+    Export-OPNSenseConfig
