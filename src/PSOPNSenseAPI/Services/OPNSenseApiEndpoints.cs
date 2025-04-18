@@ -199,6 +199,18 @@ namespace PSOPNSenseAPI.Services
         }
 
         /// <summary>
+        /// Gets the full URL for the given endpoint key
+        /// </summary>
+        /// <param name="endpointKey">The endpoint key</param>
+        /// <param name="parameters">Optional parameters to format into the endpoint</param>
+        /// <returns>The full URL</returns>
+        public string GetFullUrl(string endpointKey, params object[] parameters)
+        {
+            var endpoint = GetEndpoint(endpointKey, parameters);
+            return $"{_apiClient.BaseUrl}/api/{endpoint}";
+        }
+
+        /// <summary>
         /// Gets the OPNSense version
         /// </summary>
         /// <returns>The OPNSense version</returns>

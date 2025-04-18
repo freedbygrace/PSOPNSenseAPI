@@ -3,7 +3,7 @@
     RootModule = 'lib\PSOPNSenseAPI.dll'
 
     # Version number of this module.
-    ModuleVersion = '2025.04.16.2230'
+    ModuleVersion = '2025.04.18.1015'
 
     # Supported PSEditions
     CompatiblePSEditions = @('Desktop', 'Core')

@@ -2,7 +2,6 @@ using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 using PSOPNSenseAPI.Logging;
 using PSOPNSenseAPI.Models;
@@ -42,6 +41,16 @@ namespace PSOPNSenseAPI.Services
         /// Gets a value indicating whether the client is connected
         /// </summary>
         public bool IsConnected { get; private set; }
+
+        /// <summary>
+        /// Gets the full URL for the given endpoint
+        /// </summary>
+        /// <param name="endpoint">The endpoint</param>
+        /// <returns>The full URL</returns>
+        public string GetFullUrl(string endpoint)
+        {
+            return $"{BaseUrl}/api/{endpoint.TrimStart('/')}";
+        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="OPNSenseApiClient"/> class
@@ -92,15 +101,15 @@ namespace PSOPNSenseAPI.Services
         /// <typeparam name="T">The type to deserialize the response to</typeparam>
         /// <param name="endpoint">The API endpoint</param>
         /// <returns>The deserialized response</returns>
-        public async Task<T> GetAsync<T>(string endpoint)
+        public T Get<T>(string endpoint)
         {
             var url = $"{BaseUrl}/api/{endpoint.TrimStart('/')}";
             _logger.Debug($"GET {url}");
 
             try
             {
-                var response = await _httpClient.GetAsync(url);
-                return await ProcessResponseAsync<T>(response);
+                var response = _httpClient.GetAsync(url).GetAwaiter().GetResult();
+                return ProcessResponse<T>(response);
             }
             catch (Exception ex)
             {
@@ -116,7 +125,7 @@ namespace PSOPNSenseAPI.Services
         /// <param name="endpoint">The API endpoint</param>
         /// <param name="data">The data to send</param>
         /// <returns>The deserialized response</returns>
-        public async Task<T> PostAsync<T>(string endpoint, object data = null)
+        public T Post<T>(string endpoint, object data = null)
         {
             var url = $"{BaseUrl}/api/{endpoint.TrimStart('/')}";
             _logger.Debug($"POST {url}");
@@ -131,8 +140,8 @@ namespace PSOPNSenseAPI.Services
                     content = new StringContent(json, Encoding.UTF8, "application/json");
                 }
 
-                var response = await _httpClient.PostAsync(url, content);
-                return await ProcessResponseAsync<T>(response);
+                var response = _httpClient.PostAsync(url, content).GetAwaiter().GetResult();
+                return ProcessResponse<T>(response);
             }
             catch (Exception ex)
             {
@@ -147,9 +156,9 @@ namespace PSOPNSenseAPI.Services
         /// <typeparam name="T">The type to deserialize the response to</typeparam>
         /// <param name="response">The HTTP response</param>
         /// <returns>The deserialized response</returns>
-        private async Task<T> ProcessResponseAsync<T>(HttpResponseMessage response)
+        private T ProcessResponse<T>(HttpResponseMessage response)
         {
-            var content = await response.Content.ReadAsStringAsync();
+            var content = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
 
             _logger.Debug($"Response status: {(int)response.StatusCode} {response.StatusCode}");
             _logger.Debug($"Response body: {content}");
@@ -201,3 +210,4 @@ namespace PSOPNSenseAPI.Services
         }
     }
 }
+

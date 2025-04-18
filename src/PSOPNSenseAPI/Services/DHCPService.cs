@@ -35,6 +35,8 @@ namespace PSOPNSenseAPI.Services
             _logger.Information("Getting DHCP leases");
 
             var endpoint = _apiEndpoints.GetEndpoint("dhcp.leases.list");
+            var fullUrl = _apiEndpoints.GetFullUrl("dhcp.leases.list");
+            _logger.Verbose($"API URL: {fullUrl}");
             return _apiClient.Get<DHCPLeaseListResponse>(endpoint);
         }
 
@@ -48,6 +50,8 @@ namespace PSOPNSenseAPI.Services
             _logger.Information($"Getting DHCP lease for MAC address {macAddress}");
 
             var endpoint = _apiEndpoints.GetEndpoint("dhcp.leases.getByMac", macAddress);
+            var fullUrl = _apiEndpoints.GetFullUrl("dhcp.leases.getByMac", macAddress);
+            _logger.Verbose($"API URL: {fullUrl}");
             return _apiClient.Get<DHCPLeaseResponse>(endpoint);
         }
 
@@ -61,6 +65,8 @@ namespace PSOPNSenseAPI.Services
             _logger.Information($"Deleting DHCP lease for MAC address {macAddress}");
 
             var endpoint = _apiEndpoints.GetEndpoint("dhcp.leases.delete", macAddress);
+            var fullUrl = _apiEndpoints.GetFullUrl("dhcp.leases.delete", macAddress);
+            _logger.Verbose($"API URL: {fullUrl}");
             return _apiClient.Post<DHCPLeaseDeleteResponse>(endpoint);
         }
 
@@ -85,7 +91,9 @@ namespace PSOPNSenseAPI.Services
         {
             _logger.Information("Getting DHCP servers");
 
-            var endpoint = "dhcp/service/get";
+            var endpoint = "dhcpd/service/get";
+            var fullUrl = _apiClient.GetFullUrl(endpoint);
+            _logger.Verbose($"API URL: {fullUrl}");
             return _apiClient.Get<DHCPServerListResponse>(endpoint);
         }
 
@@ -98,7 +106,9 @@ namespace PSOPNSenseAPI.Services
         {
             _logger.Information($"Getting DHCP server for interface {@interface}");
 
-            var endpoint = $"dhcp/service/getServer/{@interface}";
+            var endpoint = $"dhcpd/service/getServer/{@interface}";
+            var fullUrl = _apiClient.GetFullUrl(endpoint);
+            _logger.Verbose($"API URL: {fullUrl}");
             return _apiClient.Get<DHCPServerResponse>(endpoint);
         }
 
@@ -112,7 +122,9 @@ namespace PSOPNSenseAPI.Services
         {
             _logger.Information($"Updating DHCP server for interface {@interface}");
 
-            var endpoint = $"dhcp/service/setServer/{@interface}";
+            var endpoint = $"dhcpd/service/setServer/{@interface}";
+            var fullUrl = _apiClient.GetFullUrl(endpoint);
+            _logger.Verbose($"API URL: {fullUrl}");
             var data = new { server = server };
             return _apiClient.Post<DHCPServerUpdateResponse>(endpoint, data);
         }
