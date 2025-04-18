@@ -22,7 +22,7 @@ namespace PSOPNSenseAPI.Cmdlets
     /// </example>
     /// </summary>
     [Cmdlet(VerbsCommunications.Connect, "OPNSense")]
-    [OutputType(typeof(void))]
+    [OutputType(typeof(PSObject))]
     public class ConnectOPNSenseCmdlet : OPNSenseBaseCmdlet
     {
         /// <summary>
@@ -64,14 +64,22 @@ namespace PSOPNSenseAPI.Cmdlets
         protected override void ProcessRecordInternal()
         {
             // Check if already connected
-            if (OPNSenseSession.IsConnected && !Force.IsPresent)
+            var sessionState = OPNSenseSessionState.Instance;
+            if (sessionState.ApiClient != null && sessionState.ApiClient.IsConnected && !Force.IsPresent)
             {
-                WriteWarning($"Already connected to {OPNSenseSession.BaseUrl}. Use -Force to reconnect.");
+                // Only write warning if WarningPreference is not SilentlyContinue
+                if (MyInvocation.BoundParameters.ContainsKey("WarningAction") ||
+                    !ActionPreference.SilentlyContinue.Equals(SessionState.PSVariable.GetValue("WarningPreference", ActionPreference.Continue)))
+                {
+                    WriteWarning($"Already connected to {sessionState.ApiClient.BaseUrl}. Use -Force to reconnect.");
+                }
                 return;
             }
 
+
+
             // Dispose existing connection if there is one
-            OPNSenseSession.Current?.Dispose();
+            sessionState.ApiClient?.Dispose();
 
             // Create a new logger
             var logger = new PowerShellLogger(this);
@@ -80,9 +88,31 @@ namespace PSOPNSenseAPI.Cmdlets
             var client = new OPNSenseApiClient(Server, ApiKey, ApiSecret, SkipCertificateCheck.IsPresent, logger);
 
             // Set the current session
-            OPNSenseSession.Current = client;
+            sessionState.ApiClient = client;
+            OPNSenseSession.Current = client; // Keep this for backward compatibility
+
+            // Reset API endpoints
+            sessionState.ResetApiEndpoints();
 
             WriteVerbose($"Connected to OPNSense firewall at {Server}");
+
+            // Detect API version
+            try
+            {
+                var apiVersion = sessionState.ApiEndpoints.GetOPNSenseVersion();
+                WriteVerbose($"Detected OPNSense API version: {apiVersion}");
+            }
+            catch (Exception ex)
+            {
+                WriteVerbose($"Failed to detect OPNSense API version: {ex.Message}. Using legacy API endpoints.");
+            }
+
+            // Create and return detailed connection info object
+            var connectionInfoHelper = new OPNSenseConnectionInfo(client, logger);
+            var connectionInfo = connectionInfoHelper.GetConnectionInfo();
+
+            WriteObject(connectionInfo);
         }
     }
 }
+

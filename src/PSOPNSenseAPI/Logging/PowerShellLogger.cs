@@ -42,7 +42,33 @@ namespace PSOPNSenseAPI.Logging
         /// <param name="message">The message to log</param>
         public void Warning(string message)
         {
-            _cmdlet.WriteWarning(message);
+            // Only write warning if WarningPreference is not SilentlyContinue
+            var cmdlet = _cmdlet as PSCmdlet;
+            if (cmdlet != null)
+            {
+                // Check if WarningAction is explicitly set or if WarningPreference is not SilentlyContinue
+                if (cmdlet.MyInvocation.BoundParameters.ContainsKey("WarningAction"))
+                {
+                    // If WarningAction is explicitly set, respect it
+                    _cmdlet.WriteWarning(message);
+                }
+                else
+                {
+                    // Get the current WarningPreference
+                    var warningPreference = cmdlet.SessionState.PSVariable.GetValue("WarningPreference", ActionPreference.SilentlyContinue);
+
+                    // Only write warning if WarningPreference is not SilentlyContinue
+                    if (!ActionPreference.SilentlyContinue.Equals(warningPreference))
+                    {
+                        _cmdlet.WriteWarning(message);
+                    }
+                }
+            }
+            else
+            {
+                // Fallback for non-PSCmdlet contexts - suppress by default
+                // _cmdlet.WriteWarning(message);
+            }
         }
 
         /// <summary>
@@ -53,7 +79,33 @@ namespace PSOPNSenseAPI.Logging
         {
             // Store the error message but don't call WriteError directly
             // The cmdlet will handle writing the error in ProcessRecord
-            _cmdlet.WriteWarning($"Error: {message}");
+            // Only write warning if WarningPreference is not SilentlyContinue
+            var cmdlet = _cmdlet as PSCmdlet;
+            if (cmdlet != null)
+            {
+                // Check if WarningAction is explicitly set or if WarningPreference is not SilentlyContinue
+                if (cmdlet.MyInvocation.BoundParameters.ContainsKey("WarningAction"))
+                {
+                    // If WarningAction is explicitly set, respect it
+                    _cmdlet.WriteWarning($"Error: {message}");
+                }
+                else
+                {
+                    // Get the current WarningPreference
+                    var warningPreference = cmdlet.SessionState.PSVariable.GetValue("WarningPreference", ActionPreference.SilentlyContinue);
+
+                    // Only write warning if WarningPreference is not SilentlyContinue
+                    if (!ActionPreference.SilentlyContinue.Equals(warningPreference))
+                    {
+                        _cmdlet.WriteWarning($"Error: {message}");
+                    }
+                }
+            }
+            else
+            {
+                // Fallback for non-PSCmdlet contexts - suppress by default
+                // _cmdlet.WriteWarning($"Error: {message}");
+            }
         }
 
         /// <summary>

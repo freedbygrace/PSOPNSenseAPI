@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 using PSOPNSenseAPI.Logging;
 
@@ -12,6 +11,7 @@ namespace PSOPNSenseAPI.Services
     {
         private readonly OPNSenseApiClient _apiClient;
         private readonly ILogger _logger;
+        private readonly OPNSenseApiEndpoints _apiEndpoints;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AliasService"/> class
@@ -22,18 +22,19 @@ namespace PSOPNSenseAPI.Services
         {
             _apiClient = apiClient;
             _logger = logger;
+            _apiEndpoints = OPNSenseSessionState.Instance.ApiEndpoints;
         }
 
         /// <summary>
         /// Gets all aliases
         /// </summary>
         /// <returns>A list of aliases</returns>
-        public async Task<AliasListResponse> GetAliasesAsync()
+        public AliasListResponse GetAliases()
         {
             _logger.Information("Getting aliases");
-            
-            var endpoint = "firewall/alias/searchItem";
-            return await _apiClient.GetAsync<AliasListResponse>(endpoint);
+
+            var endpoint = _apiEndpoints.GetEndpoint("firewall.alias.list");
+            return _apiClient.Get<AliasListResponse>(endpoint);
         }
 
         /// <summary>
@@ -41,12 +42,12 @@ namespace PSOPNSenseAPI.Services
         /// </summary>
         /// <param name="uuid">The UUID of the alias</param>
         /// <returns>The alias</returns>
-        public async Task<AliasResponse> GetAliasAsync(string uuid)
+        public AliasResponse GetAlias(string uuid)
         {
             _logger.Information($"Getting alias with UUID {uuid}");
-            
-            var endpoint = $"firewall/alias/getItem/{uuid}";
-            return await _apiClient.GetAsync<AliasResponse>(endpoint);
+
+            var endpoint = _apiEndpoints.GetEndpoint("firewall.alias.get", uuid);
+            return _apiClient.Get<AliasResponse>(endpoint);
         }
 
         /// <summary>
@@ -54,13 +55,13 @@ namespace PSOPNSenseAPI.Services
         /// </summary>
         /// <param name="alias">The alias to create</param>
         /// <returns>The response containing the UUID of the new alias</returns>
-        public async Task<AliasCreateResponse> CreateAliasAsync(AliasConfig alias)
+        public AliasCreateResponse CreateAlias(AliasConfig alias)
         {
             _logger.Information("Creating alias");
-            
-            var endpoint = "firewall/alias/addItem";
+
+            var endpoint = _apiEndpoints.GetEndpoint("firewall.alias.add");
             var data = new { alias = alias };
-            return await _apiClient.PostAsync<AliasCreateResponse>(endpoint, data);
+            return _apiClient.Post<AliasCreateResponse>(endpoint, data);
         }
 
         /// <summary>
@@ -69,13 +70,13 @@ namespace PSOPNSenseAPI.Services
         /// <param name="uuid">The UUID of the alias to update</param>
         /// <param name="alias">The updated alias</param>
         /// <returns>The response indicating success</returns>
-        public async Task<AliasUpdateResponse> UpdateAliasAsync(string uuid, AliasConfig alias)
+        public AliasUpdateResponse UpdateAlias(string uuid, AliasConfig alias)
         {
             _logger.Information($"Updating alias with UUID {uuid}");
-            
-            var endpoint = $"firewall/alias/setItem/{uuid}";
+
+            var endpoint = _apiEndpoints.GetEndpoint("firewall.alias.update", uuid);
             var data = new { alias = alias };
-            return await _apiClient.PostAsync<AliasUpdateResponse>(endpoint, data);
+            return _apiClient.Post<AliasUpdateResponse>(endpoint, data);
         }
 
         /// <summary>
@@ -83,24 +84,24 @@ namespace PSOPNSenseAPI.Services
         /// </summary>
         /// <param name="uuid">The UUID of the alias to delete</param>
         /// <returns>The response indicating success</returns>
-        public async Task<AliasDeleteResponse> DeleteAliasAsync(string uuid)
+        public AliasDeleteResponse DeleteAlias(string uuid)
         {
             _logger.Information($"Deleting alias with UUID {uuid}");
-            
-            var endpoint = $"firewall/alias/delItem/{uuid}";
-            return await _apiClient.PostAsync<AliasDeleteResponse>(endpoint);
+
+            var endpoint = _apiEndpoints.GetEndpoint("firewall.alias.delete", uuid);
+            return _apiClient.Post<AliasDeleteResponse>(endpoint);
         }
 
         /// <summary>
         /// Reconfigures aliases
         /// </summary>
         /// <returns>The response indicating success</returns>
-        public async Task<AliasReconfigureResponse> ReconfigureAliasesAsync()
+        public AliasReconfigureResponse ReconfigureAliases()
         {
             _logger.Information("Reconfiguring aliases");
-            
-            var endpoint = "firewall/alias/reconfigure";
-            return await _apiClient.PostAsync<AliasReconfigureResponse>(endpoint);
+
+            var endpoint = _apiEndpoints.GetEndpoint("firewall.alias.reconfigure");
+            return _apiClient.Post<AliasReconfigureResponse>(endpoint);
         }
     }
 
@@ -344,3 +345,4 @@ namespace PSOPNSenseAPI.Services
         public string Status { get; set; }
     }
 }
+

@@ -2,6 +2,7 @@ using System;
 using System.Management.Automation;
 using PSOPNSenseAPI.Logging;
 using PSOPNSenseAPI.Models;
+using PSOPNSenseAPI.Services;
 
 namespace PSOPNSenseAPI.Cmdlets
 {
@@ -21,27 +22,46 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Processes the cmdlet
         /// </summary>
-        protected override void BeginProcessing()
-        {
-            // Override the base implementation to avoid checking for connection
-            // since this cmdlet is used to check the connection status
-            base.BeginProcessing();
-            Logger = new PowerShellLogger(this);
-        }
-
         protected override void ProcessRecordInternal()
         {
-            if (!OPNSenseSession.IsConnected)
+            var sessionState = OPNSenseSessionState.Instance;
+            // Create a logger
+            var logger = new PowerShellLogger(this);
+
+            if (sessionState.ApiClient == null)
             {
-                WriteWarning("Not connected to any OPNSense firewall.");
+                // Only write warning if WarningPreference is not SilentlyContinue
+                if (MyInvocation.BoundParameters.ContainsKey("WarningAction") ||
+                    !ActionPreference.SilentlyContinue.Equals(SessionState.PSVariable.GetValue("WarningPreference", ActionPreference.Continue)))
+                {
+                    WriteWarning("Not connected to any OPNSense firewall.");
+                }
+
+                // Return an empty connection info object
+                var emptyConnectionInfo = new PSObject();
+                emptyConnectionInfo.Properties.Add(new PSNoteProperty("Server", null));
+                emptyConnectionInfo.Properties.Add(new PSNoteProperty("Connected", false));
+                emptyConnectionInfo.Properties.Add(new PSNoteProperty("ApiVersion", null));
+                emptyConnectionInfo.Properties.Add(new PSNoteProperty("ProductName", null));
+                emptyConnectionInfo.Properties.Add(new PSNoteProperty("ProductVersion", null));
+                emptyConnectionInfo.Properties.Add(new PSNoteProperty("OsVersion", null));
+                emptyConnectionInfo.Properties.Add(new PSNoteProperty("Hostname", null));
+                emptyConnectionInfo.Properties.Add(new PSNoteProperty("SystemTime", null));
+                emptyConnectionInfo.Properties.Add(new PSNoteProperty("Uptime", null));
+                emptyConnectionInfo.Properties.Add(new PSNoteProperty("CpuUsage", null));
+                emptyConnectionInfo.Properties.Add(new PSNoteProperty("MemoryUsage", null));
+                emptyConnectionInfo.Properties.Add(new PSNoteProperty("LastUpdate", null));
+
+                WriteObject(emptyConnectionInfo);
                 return;
             }
 
-            var connectionInfo = new PSObject();
-            connectionInfo.Properties.Add(new PSNoteProperty("Server", OPNSenseSession.BaseUrl));
-            connectionInfo.Properties.Add(new PSNoteProperty("Connected", OPNSenseSession.IsConnected));
+            // Create and return detailed connection info object
+            var connectionInfoHelper = new OPNSenseConnectionInfo(sessionState.ApiClient, logger);
+            var connectionInfo = connectionInfoHelper.GetConnectionInfo();
 
             WriteObject(connectionInfo);
         }
     }
 }
+

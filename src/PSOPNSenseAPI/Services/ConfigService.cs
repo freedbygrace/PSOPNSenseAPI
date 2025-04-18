@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 using PSOPNSenseAPI.Logging;
 using PSOPNSenseAPI.Models;
@@ -14,6 +13,7 @@ namespace PSOPNSenseAPI.Services
     {
         private readonly OPNSenseApiClient _apiClient;
         private readonly ILogger _logger;
+        private readonly OPNSenseApiEndpoints _apiEndpoints;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ConfigService"/> class
@@ -24,18 +24,19 @@ namespace PSOPNSenseAPI.Services
         {
             _apiClient = apiClient;
             _logger = logger;
+            _apiEndpoints = OPNSenseSessionState.Instance.ApiEndpoints;
         }
 
         /// <summary>
         /// Gets the list of configuration backups
         /// </summary>
         /// <returns>A list of configuration backups</returns>
-        public async Task<ConfigBackupListResponse> GetConfigBackupsAsync()
+        public ConfigBackupListResponse GetConfigBackups()
         {
             _logger.Information("Getting configuration backups");
-            
-            var endpoint = "core/backup/getBackups";
-            return await _apiClient.GetAsync<ConfigBackupListResponse>(endpoint);
+
+            var endpoint = _apiEndpoints.GetEndpoint("config.backup.list");
+            return _apiClient.Get<ConfigBackupListResponse>(endpoint);
         }
 
         /// <summary>
@@ -43,13 +44,13 @@ namespace PSOPNSenseAPI.Services
         /// </summary>
         /// <param name="filename">The filename for the backup</param>
         /// <returns>The response indicating success</returns>
-        public async Task<ConfigBackupCreateResponse> CreateConfigBackupAsync(string filename = null)
+        public ConfigBackupCreateResponse CreateConfigBackup(string filename = null)
         {
             _logger.Information("Creating configuration backup");
-            
-            var endpoint = "core/backup/backup";
+
+            var endpoint = _apiEndpoints.GetEndpoint("config.backup.create");
             var data = string.IsNullOrEmpty(filename) ? null : new { filename = filename };
-            return await _apiClient.PostAsync<ConfigBackupCreateResponse>(endpoint, data);
+            return _apiClient.Post<ConfigBackupCreateResponse>(endpoint, data);
         }
 
         /// <summary>
@@ -57,18 +58,18 @@ namespace PSOPNSenseAPI.Services
         /// </summary>
         /// <param name="filename">The filename of the backup to download</param>
         /// <returns>The backup content</returns>
-        public async Task<byte[]> DownloadConfigBackupAsync(string filename)
+        public byte[] DownloadConfigBackup(string filename)
         {
             _logger.Information($"Downloading configuration backup {filename}");
-            
-            var endpoint = $"core/backup/download/{filename}";
-            var response = await _apiClient.GetAsync<ConfigBackupDownloadResponse>(endpoint);
-            
+
+            var endpoint = _apiEndpoints.GetEndpoint("config.backup.download", filename);
+            var response = _apiClient.Get<ConfigBackupDownloadResponse>(endpoint);
+
             if (string.IsNullOrEmpty(response.Content))
             {
                 throw new OPNSenseApiException("Backup content is empty", System.Net.HttpStatusCode.NoContent, "");
             }
-            
+
             return Convert.FromBase64String(response.Content);
         }
 
@@ -77,13 +78,13 @@ namespace PSOPNSenseAPI.Services
         /// </summary>
         /// <param name="filename">The filename of the backup to restore</param>
         /// <returns>The response indicating success</returns>
-        public async Task<ConfigBackupRestoreResponse> RestoreConfigBackupAsync(string filename)
+        public ConfigBackupRestoreResponse RestoreConfigBackup(string filename)
         {
             _logger.Information($"Restoring configuration backup {filename}");
-            
-            var endpoint = "core/backup/restore";
+
+            var endpoint = _apiEndpoints.GetEndpoint("config.backup.restore");
             var data = new { filename = filename };
-            return await _apiClient.PostAsync<ConfigBackupRestoreResponse>(endpoint, data);
+            return _apiClient.Post<ConfigBackupRestoreResponse>(endpoint, data);
         }
 
         /// <summary>
@@ -91,31 +92,31 @@ namespace PSOPNSenseAPI.Services
         /// </summary>
         /// <param name="filename">The filename of the backup to delete</param>
         /// <returns>The response indicating success</returns>
-        public async Task<ConfigBackupDeleteResponse> DeleteConfigBackupAsync(string filename)
+        public ConfigBackupDeleteResponse DeleteConfigBackup(string filename)
         {
             _logger.Information($"Deleting configuration backup {filename}");
-            
-            var endpoint = "core/backup/deleteBackup";
+
+            var endpoint = _apiEndpoints.GetEndpoint("config.backup.delete");
             var data = new { filename = filename };
-            return await _apiClient.PostAsync<ConfigBackupDeleteResponse>(endpoint, data);
+            return _apiClient.Post<ConfigBackupDeleteResponse>(endpoint, data);
         }
 
         /// <summary>
         /// Exports the configuration
         /// </summary>
         /// <returns>The exported configuration</returns>
-        public async Task<byte[]> ExportConfigAsync()
+        public byte[] ExportConfig()
         {
             _logger.Information("Exporting configuration");
-            
-            var endpoint = "core/backup/download";
-            var response = await _apiClient.GetAsync<ConfigExportResponse>(endpoint);
-            
+
+            var endpoint = _apiEndpoints.GetEndpoint("config.export");
+            var response = _apiClient.Get<ConfigExportResponse>(endpoint);
+
             if (string.IsNullOrEmpty(response.Content))
             {
                 throw new OPNSenseApiException("Export content is empty", System.Net.HttpStatusCode.NoContent, "");
             }
-            
+
             return Convert.FromBase64String(response.Content);
         }
 
@@ -124,14 +125,14 @@ namespace PSOPNSenseAPI.Services
         /// </summary>
         /// <param name="configContent">The configuration content</param>
         /// <returns>The response indicating success</returns>
-        public async Task<ConfigImportResponse> ImportConfigAsync(byte[] configContent)
+        public ConfigImportResponse ImportConfig(byte[] configContent)
         {
             _logger.Information("Importing configuration");
-            
-            var endpoint = "core/backup/upload";
+
+            var endpoint = _apiEndpoints.GetEndpoint("config.import");
             var base64Content = Convert.ToBase64String(configContent);
             var data = new { content = base64Content };
-            return await _apiClient.PostAsync<ConfigImportResponse>(endpoint, data);
+            return _apiClient.Post<ConfigImportResponse>(endpoint, data);
         }
     }
 
@@ -261,3 +262,4 @@ namespace PSOPNSenseAPI.Services
         public string Status { get; set; }
     }
 }
+

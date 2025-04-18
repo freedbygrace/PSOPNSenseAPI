@@ -1,6 +1,5 @@
 using System;
 using System.Management.Automation;
-using System.Threading.Tasks;
 using PSOPNSenseAPI.Logging;
 using PSOPNSenseAPI.Models;
 using PSOPNSenseAPI.Services;
@@ -10,6 +9,7 @@ namespace PSOPNSenseAPI.Cmdlets
     /// <summary>
     /// Base class for all OPNSense cmdlets
     /// </summary>
+    [CmdletBinding()]
     public abstract class OPNSenseBaseCmdlet : PSCmdlet
     {
         /// <summary>
@@ -18,9 +18,28 @@ namespace PSOPNSenseAPI.Cmdlets
         protected override void BeginProcessing()
         {
             base.BeginProcessing();
+
+            // Set default WarningPreference to SilentlyContinue if not explicitly set
+            if (!MyInvocation.BoundParameters.ContainsKey("WarningAction"))
+            {
+                // Store the original preference
+                var originalWarningPreference = SessionState.PSVariable.GetValue("WarningPreference", ActionPreference.Continue);
+
+                // Only set it if it's not already SilentlyContinue
+                if (!ActionPreference.SilentlyContinue.Equals(originalWarningPreference))
+                {
+                    // Set the preference for this cmdlet execution
+                    SessionState.PSVariable.Set("WarningPreference", ActionPreference.SilentlyContinue);
+                }
+            }
+
             Logger = new PowerShellLogger(this);
 
-            if (!OPNSenseSession.IsConnected)
+            // Skip connection check for Connect-OPNSense and Get-OPNSenseConnection cmdlets
+            var cmdletType = GetType();
+            var sessionState = OPNSenseSessionState.Instance;
+            if (cmdletType != typeof(ConnectOPNSenseCmdlet) && cmdletType != typeof(GetOPNSenseConnectionCmdlet) &&
+                (sessionState.ApiClient == null || !sessionState.ApiClient.IsConnected))
             {
                 ThrowTerminatingError(new ErrorRecord(
                     new InvalidOperationException("Not connected to an OPNSense firewall. Use Connect-OPNSense first."),
@@ -68,7 +87,7 @@ namespace PSOPNSenseAPI.Cmdlets
         /// <summary>
         /// Gets the API client
         /// </summary>
-        protected OPNSenseApiClient ApiClient => OPNSenseSession.Current;
+        protected OPNSenseApiClient ApiClient => OPNSenseSessionState.Instance.ApiClient;
 
         /// <summary>
         /// Gets the logger
@@ -90,7 +109,13 @@ namespace PSOPNSenseAPI.Cmdlets
         {
             // Store the exception to be processed in ProcessRecord
             ProcessingException = ex;
-            WriteWarning($"Error occurred: {ex.Message}");
+
+            // Only write warning if WarningPreference is not SilentlyContinue
+            if (MyInvocation.BoundParameters.ContainsKey("WarningAction") ||
+                !ActionPreference.SilentlyContinue.Equals(SessionState.PSVariable.GetValue("WarningPreference", ActionPreference.Continue)))
+            {
+                WriteWarning($"Error occurred: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -123,44 +148,55 @@ namespace PSOPNSenseAPI.Cmdlets
         }
 
         /// <summary>
-        /// Executes an async task synchronously and safely
+        /// Safely executes a function and handles exceptions
         /// </summary>
-        /// <typeparam name="T">The return type of the task</typeparam>
-        /// <param name="asyncFunc">The async function to execute</param>
-        /// <returns>The result of the async function</returns>
-        protected T ExecuteAsyncTask<T>(Func<Task<T>> asyncFunc)
+        /// <typeparam name="T">The return type of the function</typeparam>
+        /// <param name="func">The function to execute</param>
+        /// <returns>The result of the function</returns>
+        protected T ExecuteSafely<T>(Func<T> func)
         {
             try
             {
-                // Use ConfigureAwait(false) to avoid deadlocks
-                return asyncFunc().ConfigureAwait(false).GetAwaiter().GetResult();
+                return func();
             }
             catch (Exception ex)
             {
                 // Store the exception to be processed in ProcessRecord
                 ProcessingException = ex;
-                WriteWarning($"Error occurred: {ex.Message}");
+
+                // Only write warning if WarningPreference is not SilentlyContinue
+                if (MyInvocation.BoundParameters.ContainsKey("WarningAction") ||
+                    !ActionPreference.SilentlyContinue.Equals(SessionState.PSVariable.GetValue("WarningPreference", ActionPreference.Continue)))
+                {
+                    WriteWarning($"Error occurred: {ex.Message}");
+                }
                 return default;
             }
         }
 
         /// <summary>
-        /// Executes an async task synchronously and safely (no return value)
+        /// Safely executes an action and handles exceptions
         /// </summary>
-        /// <param name="asyncAction">The async action to execute</param>
-        protected void ExecuteAsyncTask(Func<Task> asyncAction)
+        /// <param name="action">The action to execute</param>
+        protected void ExecuteSafely(Action action)
         {
             try
             {
-                // Use ConfigureAwait(false) to avoid deadlocks
-                asyncAction().ConfigureAwait(false).GetAwaiter().GetResult();
+                action();
             }
             catch (Exception ex)
             {
                 // Store the exception to be processed in ProcessRecord
                 ProcessingException = ex;
-                WriteWarning($"Error occurred: {ex.Message}");
+
+                // Only write warning if WarningPreference is not SilentlyContinue
+                if (MyInvocation.BoundParameters.ContainsKey("WarningAction") ||
+                    !ActionPreference.SilentlyContinue.Equals(SessionState.PSVariable.GetValue("WarningPreference", ActionPreference.Continue)))
+                {
+                    WriteWarning($"Error occurred: {ex.Message}");
+                }
             }
         }
     }
 }
+

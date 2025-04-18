@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 using PSOPNSenseAPI.Logging;
+using PSOPNSenseAPI.Models;
 
 namespace PSOPNSenseAPI.Services
 {
@@ -12,6 +12,7 @@ namespace PSOPNSenseAPI.Services
     {
         private readonly OPNSenseApiClient _apiClient;
         private readonly ILogger _logger;
+        private readonly OPNSenseApiEndpoints _apiEndpoints;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DHCPService"/> class
@@ -22,18 +23,19 @@ namespace PSOPNSenseAPI.Services
         {
             _apiClient = apiClient;
             _logger = logger;
+            _apiEndpoints = OPNSenseSessionState.Instance.ApiEndpoints;
         }
 
         /// <summary>
         /// Gets all DHCP leases
         /// </summary>
         /// <returns>A list of DHCP leases</returns>
-        public async Task<DHCPLeaseListResponse> GetLeasesAsync()
+        public DHCPLeaseListResponse GetLeases()
         {
             _logger.Information("Getting DHCP leases");
 
-            var endpoint = "dhcp/leases/searchLease";
-            return await _apiClient.GetAsync<DHCPLeaseListResponse>(endpoint);
+            var endpoint = _apiEndpoints.GetEndpoint("dhcp.leases.list");
+            return _apiClient.Get<DHCPLeaseListResponse>(endpoint);
         }
 
         /// <summary>
@@ -41,12 +43,12 @@ namespace PSOPNSenseAPI.Services
         /// </summary>
         /// <param name="macAddress">The MAC address of the lease</param>
         /// <returns>The DHCP lease</returns>
-        public async Task<DHCPLeaseResponse> GetLeaseByMacAsync(string macAddress)
+        public DHCPLeaseResponse GetLeaseByMac(string macAddress)
         {
             _logger.Information($"Getting DHCP lease for MAC address {macAddress}");
 
-            var endpoint = $"dhcp/leases/getLeaseByMac/{macAddress}";
-            return await _apiClient.GetAsync<DHCPLeaseResponse>(endpoint);
+            var endpoint = _apiEndpoints.GetEndpoint("dhcp.leases.getByMac", macAddress);
+            return _apiClient.Get<DHCPLeaseResponse>(endpoint);
         }
 
         /// <summary>
@@ -54,12 +56,12 @@ namespace PSOPNSenseAPI.Services
         /// </summary>
         /// <param name="macAddress">The MAC address of the lease to delete</param>
         /// <returns>The response indicating success</returns>
-        public async Task<DHCPLeaseDeleteResponse> DeleteLeaseAsync(string macAddress)
+        public DHCPLeaseDeleteResponse DeleteLease(string macAddress)
         {
             _logger.Information($"Deleting DHCP lease for MAC address {macAddress}");
 
-            var endpoint = $"dhcp/leases/delLease/{macAddress}";
-            return await _apiClient.PostAsync<DHCPLeaseDeleteResponse>(endpoint);
+            var endpoint = _apiEndpoints.GetEndpoint("dhcp.leases.delete", macAddress);
+            return _apiClient.Post<DHCPLeaseDeleteResponse>(endpoint);
         }
 
         /// <summary>
@@ -68,23 +70,23 @@ namespace PSOPNSenseAPI.Services
         /// <param name="interface">The interface name</param>
         /// <param name="lease">The lease to add</param>
         /// <returns>The response containing the UUID of the new lease</returns>
-        public async Task<DHCPStaticMappingCreateResponse> AddStaticLeaseAsync(string @interface, DHCPStaticMappingConfig lease)
+        public DHCPStaticMappingCreateResponse AddStaticLease(string @interface, DHCPStaticMappingConfig lease)
         {
             _logger.Information($"Adding static DHCP lease for interface {@interface}");
 
-            return await CreateStaticMappingAsync(@interface, lease);
+            return CreateStaticMapping(@interface, lease);
         }
 
         /// <summary>
         /// Gets all DHCP servers
         /// </summary>
         /// <returns>A list of DHCP servers</returns>
-        public async Task<DHCPServerListResponse> GetServersAsync()
+        public DHCPServerListResponse GetServers()
         {
             _logger.Information("Getting DHCP servers");
 
             var endpoint = "dhcp/service/get";
-            return await _apiClient.GetAsync<DHCPServerListResponse>(endpoint);
+            return _apiClient.Get<DHCPServerListResponse>(endpoint);
         }
 
         /// <summary>
@@ -92,12 +94,12 @@ namespace PSOPNSenseAPI.Services
         /// </summary>
         /// <param name="interface">The interface name</param>
         /// <returns>The DHCP server</returns>
-        public async Task<DHCPServerResponse> GetServerAsync(string @interface)
+        public DHCPServerResponse GetServer(string @interface)
         {
             _logger.Information($"Getting DHCP server for interface {@interface}");
 
             var endpoint = $"dhcp/service/getServer/{@interface}";
-            return await _apiClient.GetAsync<DHCPServerResponse>(endpoint);
+            return _apiClient.Get<DHCPServerResponse>(endpoint);
         }
 
         /// <summary>
@@ -106,13 +108,13 @@ namespace PSOPNSenseAPI.Services
         /// <param name="interface">The interface name</param>
         /// <param name="server">The updated server</param>
         /// <returns>The response indicating success</returns>
-        public async Task<DHCPServerUpdateResponse> UpdateServerAsync(string @interface, DHCPServerConfig server)
+        public DHCPServerUpdateResponse UpdateServer(string @interface, DHCPServerConfig server)
         {
             _logger.Information($"Updating DHCP server for interface {@interface}");
 
             var endpoint = $"dhcp/service/setServer/{@interface}";
             var data = new { server = server };
-            return await _apiClient.PostAsync<DHCPServerUpdateResponse>(endpoint, data);
+            return _apiClient.Post<DHCPServerUpdateResponse>(endpoint, data);
         }
 
         /// <summary>
@@ -120,12 +122,12 @@ namespace PSOPNSenseAPI.Services
         /// </summary>
         /// <param name="interface">The interface name</param>
         /// <returns>The response indicating success</returns>
-        public async Task<DHCPServerEnableResponse> EnableServerAsync(string @interface)
+        public DHCPServerEnableResponse EnableServer(string @interface)
         {
             _logger.Information($"Enabling DHCP server for interface {@interface}");
 
             var endpoint = $"dhcp/service/enableServer/{@interface}";
-            return await _apiClient.PostAsync<DHCPServerEnableResponse>(endpoint);
+            return _apiClient.Post<DHCPServerEnableResponse>(endpoint);
         }
 
         /// <summary>
@@ -133,12 +135,12 @@ namespace PSOPNSenseAPI.Services
         /// </summary>
         /// <param name="interface">The interface name</param>
         /// <returns>The response indicating success</returns>
-        public async Task<DHCPServerDisableResponse> DisableServerAsync(string @interface)
+        public DHCPServerDisableResponse DisableServer(string @interface)
         {
             _logger.Information($"Disabling DHCP server for interface {@interface}");
 
             var endpoint = $"dhcp/service/disableServer/{@interface}";
-            return await _apiClient.PostAsync<DHCPServerDisableResponse>(endpoint);
+            return _apiClient.Post<DHCPServerDisableResponse>(endpoint);
         }
 
         /// <summary>
@@ -146,12 +148,12 @@ namespace PSOPNSenseAPI.Services
         /// </summary>
         /// <param name="interface">The interface name</param>
         /// <returns>A list of static mappings</returns>
-        public async Task<DHCPStaticMappingListResponse> GetStaticMappingsAsync(string @interface)
+        public DHCPStaticMappingListResponse GetStaticMappings(string @interface)
         {
             _logger.Information($"Getting static mappings for interface {@interface}");
 
             var endpoint = $"dhcp/service/searchStaticMapping/{@interface}";
-            return await _apiClient.GetAsync<DHCPStaticMappingListResponse>(endpoint);
+            return _apiClient.Get<DHCPStaticMappingListResponse>(endpoint);
         }
 
         /// <summary>
@@ -160,12 +162,12 @@ namespace PSOPNSenseAPI.Services
         /// <param name="interface">The interface name</param>
         /// <param name="uuid">The UUID of the static mapping</param>
         /// <returns>The static mapping</returns>
-        public async Task<DHCPStaticMappingResponse> GetStaticMappingAsync(string @interface, string uuid)
+        public DHCPStaticMappingResponse GetStaticMapping(string @interface, string uuid)
         {
             _logger.Information($"Getting static mapping with UUID {uuid} for interface {@interface}");
 
             var endpoint = $"dhcp/service/getStaticMapping/{@interface}/{uuid}";
-            return await _apiClient.GetAsync<DHCPStaticMappingResponse>(endpoint);
+            return _apiClient.Get<DHCPStaticMappingResponse>(endpoint);
         }
 
         /// <summary>
@@ -174,13 +176,13 @@ namespace PSOPNSenseAPI.Services
         /// <param name="interface">The interface name</param>
         /// <param name="mapping">The static mapping to create</param>
         /// <returns>The response containing the UUID of the new static mapping</returns>
-        public async Task<DHCPStaticMappingCreateResponse> CreateStaticMappingAsync(string @interface, DHCPStaticMappingConfig mapping)
+        public DHCPStaticMappingCreateResponse CreateStaticMapping(string @interface, DHCPStaticMappingConfig mapping)
         {
             _logger.Information($"Creating static mapping for interface {@interface}");
 
             var endpoint = $"dhcp/service/addStaticMapping/{@interface}";
             var data = new { mapping = mapping };
-            return await _apiClient.PostAsync<DHCPStaticMappingCreateResponse>(endpoint, data);
+            return _apiClient.Post<DHCPStaticMappingCreateResponse>(endpoint, data);
         }
 
         /// <summary>
@@ -190,13 +192,13 @@ namespace PSOPNSenseAPI.Services
         /// <param name="uuid">The UUID of the static mapping to update</param>
         /// <param name="mapping">The updated static mapping</param>
         /// <returns>The response indicating success</returns>
-        public async Task<DHCPStaticMappingUpdateResponse> UpdateStaticMappingAsync(string @interface, string uuid, DHCPStaticMappingConfig mapping)
+        public DHCPStaticMappingUpdateResponse UpdateStaticMapping(string @interface, string uuid, DHCPStaticMappingConfig mapping)
         {
             _logger.Information($"Updating static mapping with UUID {uuid} for interface {@interface}");
 
             var endpoint = $"dhcp/service/setStaticMapping/{@interface}/{uuid}";
             var data = new { mapping = mapping };
-            return await _apiClient.PostAsync<DHCPStaticMappingUpdateResponse>(endpoint, data);
+            return _apiClient.Post<DHCPStaticMappingUpdateResponse>(endpoint, data);
         }
 
         /// <summary>
@@ -205,12 +207,12 @@ namespace PSOPNSenseAPI.Services
         /// <param name="interface">The interface name</param>
         /// <param name="uuid">The UUID of the static mapping to delete</param>
         /// <returns>The response indicating success</returns>
-        public async Task<DHCPStaticMappingDeleteResponse> DeleteStaticMappingAsync(string @interface, string uuid)
+        public DHCPStaticMappingDeleteResponse DeleteStaticMapping(string @interface, string uuid)
         {
             _logger.Information($"Deleting static mapping with UUID {uuid} for interface {@interface}");
 
             var endpoint = $"dhcp/service/delStaticMapping/{@interface}/{uuid}";
-            return await _apiClient.PostAsync<DHCPStaticMappingDeleteResponse>(endpoint);
+            return _apiClient.Post<DHCPStaticMappingDeleteResponse>(endpoint);
         }
 
         /// <summary>
@@ -218,12 +220,12 @@ namespace PSOPNSenseAPI.Services
         /// </summary>
         /// <param name="interface">The interface name</param>
         /// <returns>The DHCP options</returns>
-        public async Task<DHCPOptionsListResponse> GetOptionsAsync(string @interface)
+        public DHCPOptionsListResponse GetOptions(string @interface)
         {
             _logger.Information($"Getting DHCP options for interface {@interface}");
 
             var endpoint = $"dhcp/service/searchOptions/{@interface}";
-            return await _apiClient.GetAsync<DHCPOptionsListResponse>(endpoint);
+            return _apiClient.Get<DHCPOptionsListResponse>(endpoint);
         }
 
         /// <summary>
@@ -232,12 +234,12 @@ namespace PSOPNSenseAPI.Services
         /// <param name="interface">The interface name</param>
         /// <param name="uuid">The UUID of the option</param>
         /// <returns>The DHCP option</returns>
-        public async Task<DHCPOptionResponse> GetOptionAsync(string @interface, string uuid)
+        public DHCPOptionResponse GetOption(string @interface, string uuid)
         {
             _logger.Information($"Getting DHCP option with UUID {uuid} for interface {@interface}");
 
             var endpoint = $"dhcp/service/getOption/{@interface}/{uuid}";
-            return await _apiClient.GetAsync<DHCPOptionResponse>(endpoint);
+            return _apiClient.Get<DHCPOptionResponse>(endpoint);
         }
 
         /// <summary>
@@ -246,13 +248,13 @@ namespace PSOPNSenseAPI.Services
         /// <param name="interface">The interface name</param>
         /// <param name="option">The option to create</param>
         /// <returns>The response containing the UUID of the new option</returns>
-        public async Task<DHCPOptionCreateResponse> CreateOptionAsync(string @interface, DHCPOptionConfig option)
+        public DHCPOptionCreateResponse CreateOption(string @interface, DHCPOptionConfig option)
         {
             _logger.Information($"Creating DHCP option for interface {@interface}");
 
             var endpoint = $"dhcp/service/addOption/{@interface}";
             var data = new { option = option };
-            return await _apiClient.PostAsync<DHCPOptionCreateResponse>(endpoint, data);
+            return _apiClient.Post<DHCPOptionCreateResponse>(endpoint, data);
         }
 
         /// <summary>
@@ -262,13 +264,13 @@ namespace PSOPNSenseAPI.Services
         /// <param name="uuid">The UUID of the option to update</param>
         /// <param name="option">The updated option</param>
         /// <returns>The response indicating success</returns>
-        public async Task<DHCPOptionUpdateResponse> UpdateOptionAsync(string @interface, string uuid, DHCPOptionConfig option)
+        public DHCPOptionUpdateResponse UpdateOption(string @interface, string uuid, DHCPOptionConfig option)
         {
             _logger.Information($"Updating DHCP option with UUID {uuid} for interface {@interface}");
 
             var endpoint = $"dhcp/service/setOption/{@interface}/{uuid}";
             var data = new { option = option };
-            return await _apiClient.PostAsync<DHCPOptionUpdateResponse>(endpoint, data);
+            return _apiClient.Post<DHCPOptionUpdateResponse>(endpoint, data);
         }
 
         /// <summary>
@@ -277,24 +279,24 @@ namespace PSOPNSenseAPI.Services
         /// <param name="interface">The interface name</param>
         /// <param name="uuid">The UUID of the option to delete</param>
         /// <returns>The response indicating success</returns>
-        public async Task<DHCPOptionDeleteResponse> DeleteOptionAsync(string @interface, string uuid)
+        public DHCPOptionDeleteResponse DeleteOption(string @interface, string uuid)
         {
             _logger.Information($"Deleting DHCP option with UUID {uuid} for interface {@interface}");
 
             var endpoint = $"dhcp/service/delOption/{@interface}/{uuid}";
-            return await _apiClient.PostAsync<DHCPOptionDeleteResponse>(endpoint);
+            return _apiClient.Post<DHCPOptionDeleteResponse>(endpoint);
         }
 
         /// <summary>
         /// Applies DHCP changes
         /// </summary>
         /// <returns>The response indicating success</returns>
-        public async Task<DHCPApplyResponse> ApplyChangesAsync()
+        public DHCPApplyResponse ApplyChanges()
         {
             _logger.Information("Applying DHCP changes");
 
             var endpoint = "dhcp/service/reconfigure";
-            return await _apiClient.PostAsync<DHCPApplyResponse>(endpoint);
+            return _apiClient.Post<DHCPApplyResponse>(endpoint);
         }
     }
 
@@ -1066,3 +1068,4 @@ namespace PSOPNSenseAPI.Services
         public string Result { get; set; }
     }
 }
+
